@@ -72,8 +72,12 @@ router.get('/songs/:id/download', authenticateTokenOrSinger, async (req, res) =>
         }
 
         const id = req.params.id;
+        const song = await libraryService.getSongById(id);
+        if (!song) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
         const fullPath = await libraryService.getSongFullPath(id);
-        
         if (!fullPath) {
             return res.status(404).json({ error: 'Song not found' });
         }

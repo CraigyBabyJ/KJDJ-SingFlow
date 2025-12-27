@@ -55,6 +55,7 @@ const db = new sqlite3.Database(resolvedPath, (err) => {
             file_path TEXT UNIQUE NOT NULL,
             size INTEGER,
             mtime INTEGER,
+            media_type TEXT DEFAULT 'zip',
             active BOOLEAN DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -64,6 +65,28 @@ const db = new sqlite3.Database(resolvedPath, (err) => {
         db.run(`CREATE INDEX IF NOT EXISTS idx_songs_artist ON songs(artist)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_songs_title ON songs(title)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_songs_active ON songs(active)`);
+
+        db.all("PRAGMA table_info(songs)", (err, columns) => {
+            if (err) return console.error("Error getting songs info", err);
+            const colNames = columns.map(c => c.name);
+
+            if (!colNames.includes('media_type')) {
+                console.log("Adding media_type to songs table");
+                db.run("ALTER TABLE songs ADD COLUMN media_type TEXT DEFAULT 'zip'", (alterErr) => {
+                    if (alterErr) {
+                        console.error("Failed to add media_type", alterErr);
+                        return;
+                    }
+                    db.run("UPDATE songs SET media_type = 'zip' WHERE media_type IS NULL", (updateErr) => {
+                        if (updateErr) console.error("Failed to backfill media_type", updateErr);
+                    });
+                });
+            } else {
+                db.run("UPDATE songs SET media_type = 'zip' WHERE media_type IS NULL", (updateErr) => {
+                    if (updateErr) console.error("Failed to backfill media_type", updateErr);
+                });
+            }
+        });
 
         // 4. Queue
         db.run(`CREATE TABLE IF NOT EXISTS queue (
