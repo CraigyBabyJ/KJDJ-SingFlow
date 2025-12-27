@@ -44,7 +44,7 @@ const setRotationEnabled = async (enabled) => {
 const getNextSelection = async (hostId, rotationEnabled = true) => {
     if (!rotationEnabled) {
         let sql = `
-            SELECT q.id as queue_id, q.song_id, so.title, so.artist, so.file_path, q.singer_id, s.name as singer_name
+            SELECT q.id as queue_id, q.song_id, so.title, so.artist, so.file_path, so.media_type, q.singer_id, s.name as singer_name
             FROM queue_entries q
             JOIN songs so ON q.song_id = so.id
             JOIN singers s ON q.singer_id = s.id
@@ -84,7 +84,7 @@ const getNextSelection = async (hostId, rotationEnabled = true) => {
 
     // 2. Select their earliest queued song
     let sqlSong = `
-        SELECT q.id as queue_id, q.song_id, so.title, so.artist, so.file_path, q.singer_id, s.name as singer_name
+        SELECT q.id as queue_id, q.song_id, so.title, so.artist, so.file_path, so.media_type, q.singer_id, s.name as singer_name
         FROM queue_entries q
         JOIN songs so ON q.song_id = so.id
         JOIN singers s ON q.singer_id = s.id
@@ -107,7 +107,7 @@ const getNextSelection = async (hostId, rotationEnabled = true) => {
 const getUpcomingRotation = async (hostId, limit = 5, rotationEnabled = true) => {
     if (!rotationEnabled) {
         let sql = `
-            SELECT q.id as queue_id, q.song_id, so.title, so.artist, q.singer_id, s.name as singer_name
+            SELECT q.id as queue_id, q.song_id, so.title, so.artist, so.media_type, q.singer_id, s.name as singer_name
             FROM queue_entries q
             JOIN songs so ON q.song_id = so.id
             JOIN singers s ON q.singer_id = s.id
@@ -146,7 +146,7 @@ const getUpcomingRotation = async (hostId, limit = 5, rotationEnabled = true) =>
     const results = [];
     for (const singer of singers) {
         let sqlSong = `
-            SELECT q.id as queue_id, q.song_id, so.title, so.artist, q.singer_id, s.name as singer_name
+            SELECT q.id as queue_id, q.song_id, so.title, so.artist, so.media_type, q.singer_id, s.name as singer_name
             FROM queue_entries q
             JOIN songs so ON q.song_id = so.id
             JOIN singers s ON q.singer_id = s.id

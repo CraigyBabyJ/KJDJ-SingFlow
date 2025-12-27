@@ -138,6 +138,7 @@ const HostController = ({
                         title: song.title,
                         artist: song.artist,
                         file_path: song.file_path,
+                        media_type: song.media_type,
                         status: 'queued'
                     }
                 ]));
