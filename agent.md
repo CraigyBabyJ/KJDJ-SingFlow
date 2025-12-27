@@ -177,6 +177,10 @@ If the backend stays on `3000`, update that proxy or set `PORT=3002` in `backend
 - If `yt-dlp` is installed via `pipx`, ensure `~/.local/bin` is on the backend PATH or set `YTDLP_BIN=/home/<user>/.local/bin/yt-dlp`.
 - Optional binary override: `YTDLP_BIN=/full/path/to/yt-dlp` (must be executable).
 - Optional cookies support: set `YTDLP_COOKIES_FILE=/path/to/cookies.txt` to avoid 403s on restricted videos.
+- Optional auto-upgrade: `backend/scripts/yt-dlp-upgrade.sh` uses `pipx upgrade yt-dlp` and expects `pipx` on PATH.
+- Cron example (daily 03:15, logs to user home):
+  - `15 3 * * * /home/craig/projects/kjdj/backend/scripts/yt-dlp-upgrade.sh >> /home/craig/yt-dlp-upgrade.log 2>&1`
+- Systemd example: see the cron/systemd snippets in `README.md`.
 
 ### Common Tasks
 - **Library Scan:** Triggered on-demand from the Host UI (Refresh Lib). No scan on backend startup.

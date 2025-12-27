@@ -4,9 +4,18 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const db = require('../db');
 
+/**
+ * @file youtubeImportService.js
+ * @description Service for downloading and importing karaoke tracks from YouTube using yt-dlp.
+ * Handles the download process, file conversion (if needed), and database registration.
+ */
+
 const YOUTUBE_DIR_NAME = '#Youtube Karaoke Downloads';
 const ACTIVE_STATUSES = ['queued', 'downloading', 'processing'];
 
+/**
+ * Helper to run SQL queries as promises
+ */
 const dbRun = (sql, params = []) => {
     return new Promise((resolve, reject) => {
         db.run(sql, params, function (err) {

@@ -59,12 +59,27 @@ If you keep the backend on its default `3000`, update `frontend/vite.config.js` 
 - `/api/library/songs/:id/download` is HOST-only. Singer sessions are blocked.
 - Singers can search + queue but never receive karaoke file bytes.
 
+## Features
+
+### YouTube Import
+Hosts can import karaoke tracks directly from YouTube.
+- **Requirement**: `yt-dlp` and `ffmpeg` must be installed on the backend server.
+- **Usage**: Paste a YouTube URL in the Host Dashboard to download.
+- **Storage**: Files are saved to a `#Youtube Karaoke Downloads` folder in your media library.
+
+### Real-Time Visualizer
+The Host UI includes a Web Audio API-based spectrum analyzer in the header that reacts to the currently playing track.
+
+### Pop-out Player & Controls
+- **Pop-out Window**: Detach the lyrics/video display to a separate window for external monitors/projectors.
+- **Volume Control**: Persistent local volume slider.
+
 ## Optional: Auto-upgrade yt-dlp
 
 If you installed `yt-dlp` via `pipx`, you can run a daily upgrade using cron or a systemd timer.
 This repo includes a helper script and sample systemd unit files:
 
-- `backend/scripts/yt-dlp-upgrade.sh`
+- `backend/scripts/yt-dlp-upgrade.sh` (requires `pipx` on PATH)
 - `backend/scripts/yt-dlp-upgrade.service`
 - `backend/scripts/yt-dlp-upgrade.timer`
 
@@ -81,4 +96,9 @@ sudo systemctl enable --now yt-dlp-upgrade.timer
 Cron alternative (runs daily at 3:15 AM):
 ```bash
 15 3 * * * /home/craig/projects/kjdj/backend/scripts/yt-dlp-upgrade.sh >> /var/log/yt-dlp-upgrade.log 2>&1
+```
+
+Example for this machine (installed in `craig` crontab):
+```bash
+15 3 * * * /home/craig/projects/kjdj/backend/scripts/yt-dlp-upgrade.sh >> /home/craig/yt-dlp-upgrade.log 2>&1
 ```

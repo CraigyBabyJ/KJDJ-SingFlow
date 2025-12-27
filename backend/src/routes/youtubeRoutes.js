@@ -3,6 +3,19 @@ const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/authMiddleware');
 const youtubeImportService = require('../services/youtubeImportService');
 
+/**
+ * @file youtubeRoutes.js
+ * @description Express routes for managing YouTube karaoke imports.
+ * Requires authentication and 'admin' or 'host' role.
+ */
+
+/**
+ * POST /api/youtube/import
+ * Starts a new YouTube import job.
+ * 
+ * @param {string} req.body.url - The YouTube URL to import
+ * @returns {Object} JSON object containing the new jobId
+ */
 router.post('/import', authenticateToken, requireRole(['admin', 'HOST', 'host']), async (req, res) => {
     try {
         const { url } = req.body || {};
@@ -19,6 +32,13 @@ router.post('/import', authenticateToken, requireRole(['admin', 'HOST', 'host'])
     }
 });
 
+/**
+ * GET /api/youtube/import/:jobId
+ * Retrieves the status of a specific import job.
+ * 
+ * @param {string} req.params.jobId - The ID of the job to check
+ * @returns {Object} Job status, progress, message, and created song details (if complete)
+ */
 router.get('/import/:jobId', authenticateToken, requireRole(['admin', 'HOST', 'host']), async (req, res) => {
     try {
         const { jobId } = req.params;
