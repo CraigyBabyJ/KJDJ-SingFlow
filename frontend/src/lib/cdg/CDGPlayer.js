@@ -121,10 +121,14 @@ export default class CDGPlayer {
     this.frameId = requestFrame(this.update);
 
     const lastTimestamp = this.lastTimestamp ?? timestamp;
+    const delta = timestamp - lastTimestamp;
     if (this.lastSyncPos != null) {
-      this.pos = this.lastSyncPos + (timestamp - lastTimestamp);
+      // Advance from the last synced audio time; accumulate so we don't snap back
+      // to the original anchor each frame (which caused visible lyric stutter).
+      this.pos = this.lastSyncPos + delta;
+      this.lastSyncPos = this.pos;
     } else {
-      this.pos += timestamp - lastTimestamp;
+      this.pos += delta;
     }
     this.lastTimestamp = timestamp;
 
@@ -134,6 +138,7 @@ export default class CDGPlayer {
 
     if (newPc < this.pc) {
       this.pc = 0;
+
       this.frameBuffer.reset();
     }
 
