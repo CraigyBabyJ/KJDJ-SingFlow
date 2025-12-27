@@ -56,6 +56,9 @@ const db = new sqlite3.Database(resolvedPath, (err) => {
             size INTEGER,
             mtime INTEGER,
             media_type TEXT DEFAULT 'zip',
+            source TEXT,
+            video_id TEXT,
+            duration INTEGER,
             active BOOLEAN DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -86,7 +89,36 @@ const db = new sqlite3.Database(resolvedPath, (err) => {
                     if (updateErr) console.error("Failed to backfill media_type", updateErr);
                 });
             }
+
+            if (!colNames.includes('source')) {
+                console.log("Adding source to songs table");
+                db.run("ALTER TABLE songs ADD COLUMN source TEXT");
+            }
+            if (!colNames.includes('video_id')) {
+                console.log("Adding video_id to songs table");
+                db.run("ALTER TABLE songs ADD COLUMN video_id TEXT");
+            }
+            if (!colNames.includes('duration')) {
+                console.log("Adding duration to songs table");
+                db.run("ALTER TABLE songs ADD COLUMN duration INTEGER");
+            }
+            db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_video_id ON songs(video_id)");
         });
+
+        // 3b. YouTube Import Jobs
+        db.run(`CREATE TABLE IF NOT EXISTS youtube_import_jobs (
+            job_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            progress INTEGER DEFAULT 0,
+            message TEXT,
+            url TEXT,
+            video_id TEXT,
+            target_path TEXT,
+            song_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(song_id) REFERENCES songs(id)
+        )`);
 
         // 4. Queue
         db.run(`CREATE TABLE IF NOT EXISTS queue (

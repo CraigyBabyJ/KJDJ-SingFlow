@@ -1,0 +1,8 @@
+[Unit]
+Description=Upgrade yt-dlp via pipx
+
+[Service]
+Type=oneshot
+# Set this to the user that installed pipx/yt-dlp.
+User=kjdj
+ExecStart=/usr/bin/env bash /home/craig/projects/kjdj/backend/scripts/yt-dlp-upgrade.sh

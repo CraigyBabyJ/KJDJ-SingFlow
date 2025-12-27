@@ -38,6 +38,15 @@ const HostController = ({
     const [hostList, setHostList] = useState([]);
     const [hostError, setHostError] = useState('');
     const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+    const [showYoutubeImport, setShowYoutubeImport] = useState(false);
+    const [youtubeUrl, setYoutubeUrl] = useState('');
+    const [youtubeJobId, setYoutubeJobId] = useState(null);
+    const [youtubeStatus, setYoutubeStatus] = useState('');
+    const [youtubeProgress, setYoutubeProgress] = useState(0);
+    const [youtubeMessage, setYoutubeMessage] = useState('');
+    const [youtubeSong, setYoutubeSong] = useState(null);
+    const [youtubeError, setYoutubeError] = useState('');
+    const [youtubeLoading, setYoutubeLoading] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -179,6 +188,65 @@ const HostController = ({
         }
     };
 
+    const handleStartYoutubeImport = async () => {
+        if (!youtubeUrl.trim()) {
+            setYoutubeError('Paste a YouTube URL first.');
+            return;
+        }
+        setYoutubeError('');
+        setYoutubeSong(null);
+        setYoutubeLoading(true);
+        try {
+            const res = await axios.post('/api/youtube/import', { url: youtubeUrl.trim() });
+            setYoutubeJobId(res.data?.jobId || null);
+            setYoutubeStatus('queued');
+            setYoutubeProgress(0);
+            setYoutubeMessage('Queued');
+        } catch (err) {
+            setYoutubeError(err.response?.data?.error || 'Failed to start import');
+        } finally {
+            setYoutubeLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!youtubeJobId) return;
+        let cancelled = false;
+        let intervalId;
+
+        const poll = async () => {
+            try {
+                const res = await axios.get(`/api/youtube/import/${youtubeJobId}`);
+                if (cancelled) return;
+                const { status, progress, message, song } = res.data || {};
+                setYoutubeStatus(status || '');
+                setYoutubeProgress(Number.isFinite(progress) ? progress : 0);
+                setYoutubeMessage(message || '');
+                if (song) {
+                    setYoutubeSong(song);
+                }
+                if (status === 'done' || status === 'error') {
+                    clearInterval(intervalId);
+                    if (status === 'done' && searchQuery) {
+                        searchSongs();
+                    }
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setYoutubeError(err.response?.data?.error || 'Failed to check status');
+                }
+                clearInterval(intervalId);
+            }
+        };
+
+        poll();
+        intervalId = setInterval(poll, 800);
+        return () => {
+            cancelled = true;
+            clearInterval(intervalId);
+        };
+    }, [youtubeJobId, searchQuery]);
+
     const orderedQueue = useMemo(() => queue, [queue]);
 
     const queuedCounts = useMemo(() => {
@@ -294,6 +362,12 @@ const HostController = ({
                             className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-500"
                         >
                             Refresh Lib
+                        </button>
+                        <button
+                            onClick={() => setShowYoutubeImport(true)}
+                            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"
+                        >
+                            YouTube Import
                         </button>
                         <button
                             onClick={onLogout}
@@ -584,6 +658,63 @@ const HostController = ({
                                         </div>
                                     </div>
                                 ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showYoutubeImport && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+                    <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-zinc-100 shadow-soft">
+                        <div className="flex items-center justify-between">
+                            <div className="text-lg font-semibold">YouTube Import</div>
+                            <button
+                                onClick={() => setShowYoutubeImport(false)}
+                                className="text-zinc-400 hover:text-white"
+                                aria-label="Close"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                            <label className="text-xs uppercase tracking-[0.3em] text-zinc-500">Paste URL</label>
+                            <input
+                                type="text"
+                                value={youtubeUrl}
+                                onChange={(e) => setYoutubeUrl(e.target.value)}
+                                placeholder="https://www.youtube.com/watch?v=..."
+                                className="h-11 w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                            <div className="text-xs text-zinc-500">
+                                Saves into #Youtube Karaoke Downloads inside the library.
+                            </div>
+                            <button
+                                onClick={handleStartYoutubeImport}
+                                disabled={youtubeLoading}
+                                className="h-11 w-full rounded-lg bg-emerald-500 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-emerald-500/60"
+                            >
+                                {youtubeLoading ? 'Starting…' : 'Grab'}
+                            </button>
+                            {youtubeError && <div className="text-sm text-amber-400">{youtubeError}</div>}
+                            {youtubeStatus && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-xs text-zinc-400">
+                                        <span>Status: {youtubeStatus}</span>
+                                        <span>{youtubeProgress}%</span>
+                                    </div>
+                                    <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+                                        <div
+                                            className="h-full bg-emerald-500 transition-all"
+                                            style={{ width: `${youtubeProgress}%` }}
+                                        />
+                                    </div>
+                                    <div className="text-xs text-zinc-400">{youtubeMessage}</div>
+                                </div>
+                            )}
+                            {youtubeSong && (
+                                <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-sm">
+                                    Added: <span className="font-semibold">{toTitleCase(youtubeSong.title)}</span>
+                                </div>
                             )}
                         </div>
                     </div>

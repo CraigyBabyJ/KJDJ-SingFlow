@@ -10,6 +10,7 @@ const singerRoutes = require('./routes/singerRoutes');
 const playbackRoutes = require('./routes/playbackRoutes');
 const rotationRoutes = require('./routes/rotationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const youtubeRoutes = require('./routes/youtubeRoutes');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -27,6 +28,7 @@ app.use('/api/singers', singerRoutes);
 app.use('/api/playback', playbackRoutes);
 app.use('/api/rotation', rotationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/youtube', youtubeRoutes);
 
 // Basic health check route
 app.get('/api/health', (req, res) => {

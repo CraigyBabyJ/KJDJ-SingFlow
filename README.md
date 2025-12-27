@@ -58,3 +58,27 @@ If you keep the backend on its default `3000`, update `frontend/vite.config.js` 
 ## Security Notes
 - `/api/library/songs/:id/download` is HOST-only. Singer sessions are blocked.
 - Singers can search + queue but never receive karaoke file bytes.
+
+## Optional: Auto-upgrade yt-dlp
+
+If you installed `yt-dlp` via `pipx`, you can run a daily upgrade using cron or a systemd timer.
+This repo includes a helper script and sample systemd unit files:
+
+- `backend/scripts/yt-dlp-upgrade.sh`
+- `backend/scripts/yt-dlp-upgrade.service`
+- `backend/scripts/yt-dlp-upgrade.timer`
+
+Before enabling, edit the service file to set the correct `User=` and path to the script.
+
+Example systemd setup (run as root):
+```bash
+sudo cp /home/craig/projects/kjdj/backend/scripts/yt-dlp-upgrade.service /etc/systemd/system/
+sudo cp /home/craig/projects/kjdj/backend/scripts/yt-dlp-upgrade.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now yt-dlp-upgrade.timer
+```
+
+Cron alternative (runs daily at 3:15 AM):
+```bash
+15 3 * * * /home/craig/projects/kjdj/backend/scripts/yt-dlp-upgrade.sh >> /var/log/yt-dlp-upgrade.log 2>&1
+```

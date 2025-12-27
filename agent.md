@@ -152,6 +152,7 @@ The database is SQLite. Key tables include:
 ### Prerequisites
 - Node.js v16+
 - NPM
+- yt-dlp (for YouTube import)
 
 ### Setup
 1.  **Backend:**
@@ -170,6 +171,12 @@ The database is SQLite. Key tables include:
 
 Vite proxies `/api` to `http://localhost:3002` in `frontend/vite.config.js`.
 If the backend stays on `3000`, update that proxy or set `PORT=3002` in `backend/.env`.
+
+### YouTube Import Notes
+- yt-dlp is required for the host-only YouTube import feature.
+- If `yt-dlp` is installed via `pipx`, ensure `~/.local/bin` is on the backend PATH or set `YTDLP_BIN=/home/<user>/.local/bin/yt-dlp`.
+- Optional binary override: `YTDLP_BIN=/full/path/to/yt-dlp` (must be executable).
+- Optional cookies support: set `YTDLP_COOKIES_FILE=/path/to/cookies.txt` to avoid 403s on restricted videos.
 
 ### Common Tasks
 - **Library Scan:** Triggered on-demand from the Host UI (Refresh Lib). No scan on backend startup.
