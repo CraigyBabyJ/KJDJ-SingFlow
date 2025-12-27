@@ -12,7 +12,7 @@ Hosts control playback; singers join via QR to search and queue only.
     - `db/`: Directory for the SQLite database file (`kjdj.db`).
 - **frontend/**: Contains the React application (Vite).
     - `src/`: React source code.
-- **CDGPlayer/**: Existing CDGPlayer library.
+- **CDGPlayer/**: Legacy upstream package retained only for historical reference; the live player implementation now lives in `frontend/src/lib/cdg/`.
 
 ## Configuration
 

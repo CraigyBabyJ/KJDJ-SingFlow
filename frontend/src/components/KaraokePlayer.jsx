@@ -96,6 +96,12 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                 cdgPlayerRef.current.stop();
             }
 
+            // CDGPlayer is treated as a drop-in renderer with a narrow surface area:
+            // - constructor accepts a { contextOptions: { canvas, width, height } } bag
+            // - load(cdgData) is called once the ZIP is parsed to a Uint8Array
+            // - play/stop/reset mirror audio playback control flow
+            // - sync(ms) is called from time updates and resyncs to align with audioRef
+            // - rendering is expected to target the provided 300x216 canvas element
             cdgPlayerRef.current = new CDGPlayer({
                 contextOptions: {
                     canvas: canvasElement,
