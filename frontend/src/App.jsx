@@ -17,6 +17,7 @@ function App() {
   const [upcoming, setUpcoming] = useState([]); // List of next 3-5 singers
   const [showNextUp, setShowNextUp] = useState(true);
   const playerRef = React.useRef(null);
+  const [audioAnalyser, setAudioAnalyser] = useState(null);
   const [playbackStatus, setPlaybackStatus] = useState('stopped');
   const [playbackTime, setPlaybackTime] = useState({ current: 0, duration: 0 });
   const [loadNextStatus, setLoadNextStatus] = useState({ pending: false, error: '' });
@@ -214,6 +215,7 @@ function App() {
             onPanicStop={handlePanicStop}
             onResyncDisplay={handleResyncDisplay}
             loadNextStatus={loadNextStatus}
+            audioAnalyser={audioAnalyser}
           >
             <KaraokePlayer
               ref={playerRef}
@@ -227,6 +229,7 @@ function App() {
               onTimeUpdate={(current, duration) => setPlaybackTime({ current, duration })}
               onResyncDisplay={handleResyncDisplay}
               onLoadNext={handleLoadNext}
+              onAnalyserReady={setAudioAnalyser}
             />
           </HostController>
         </div>

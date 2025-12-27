@@ -186,3 +186,10 @@ If the backend stays on `3000`, update that proxy or set `PORT=3002` in `backend
 - [x] Panic Stop + Resync Display QoL controls
 - [x] Host-only media download endpoint (singers blocked)
 - [x] Host admin modal for managing hosts (craig/admin only)
+
+## 9. Troubleshooting
+- Blank page after login: clear `localStorage` keys `token` and `user`, then reload.
+- If it still blanks, check the console for missing imports or state in the Host header:
+  - `ReferenceError: audioAnalyser is not defined`: ensure `frontend/src/App.jsx` defines `audioAnalyser` state.
+  - `ReferenceError: AudioVisualizer is not defined`: ensure `frontend/src/components/HostController.jsx` imports `./AudioVisualizer`.
+- Visualizer not animating: browser audio context may be suspended until playback; ensure `frontend/src/components/KaraokePlayer.jsx` initializes/resumes the AudioContext on play.

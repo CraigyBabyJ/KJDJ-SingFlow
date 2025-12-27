@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import axios from 'axios';
 import QueuePanel from './QueuePanel';
+import AudioVisualizer from './AudioVisualizer';
 import { isVocalTrack, toTitleCase } from '../lib/text';
 import QRCode from 'qrcode';
 
@@ -15,6 +16,7 @@ const HostController = ({
     onPanicStop,
     onResyncDisplay,
     loadNextStatus = { pending: false, error: '' },
+    audioAnalyser,
     children,
 }) => {
     const [singers, setSingers] = useState([]);
@@ -256,8 +258,13 @@ const HostController = ({
                         <div className="text-xl font-semibold text-zinc-100 drop-shadow-[0_0_12px_rgba(255,255,255,0.25)]">
                             KJDJ SingFlow
                         </div>
-                        <div className="text-[11px] font-medium uppercase tracking-[0.3em] text-zinc-400">Let’s keep the mic moving.</div>
+                        <div className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.3em] text-zinc-400 leading-none">
+                            <span>Let’s keep the mic moving.</span>
+                            {/* Real-time audio spectrum visualizer in the header */}
+                            <AudioVisualizer analyser={audioAnalyser} width={160} height={20} className="-mt-0.5 block" />
+                        </div>
                     </div>
+
                     <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400">
                         {joinUrl && (
                             <button

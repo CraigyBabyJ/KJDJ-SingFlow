@@ -21,6 +21,12 @@ If your backend runs on `3000`, update `frontend/vite.config.js` or set `PORT=30
 - `/join/:token` singer join flow (sets singer session cookie)
 - `/request` singer request page
 
+## Troubleshooting
+
+- Blank page after login: clear `localStorage` keys `token` and `user`, then reload.
+- Host header visualizer missing: ensure `AudioVisualizer` is imported in `frontend/src/components/HostController.jsx`.
+- Visualizer not animating: AudioContext may be suspended until playback; init/resume on play in `frontend/src/components/KaraokePlayer.jsx`.
+
 ## Build
 
 ```bash

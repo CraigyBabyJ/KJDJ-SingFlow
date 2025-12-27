@@ -16,19 +16,66 @@ const KaraokePlayer = React.memo(React.forwardRef(({
     onTimeUpdate,
     onResyncDisplay,
     onLoadNext,
+    onAnalyserReady,
 }, ref) => {
     const audioRef = useRef(null);
     const [canvasElement, setCanvasElement] = useState(null);
     const cdgPlayerRef = useRef(null);
     const cdgDataRef = useRef(null);
+    const audioContextRef = useRef(null);
+    const sourceNodeRef = useRef(null);
+    const analyserRef = useRef(null);
     const [status, setStatus] = useState('idle'); // idle, loading, ready, error
     const [audioSrc, setAudioSrc] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [isPoppedOut, setIsPoppedOut] = useState(false);
     const [timeState, setTimeState] = useState({ current: 0, duration: 0 });
     const [isPlaying, setIsPlaying] = useState(false);
+    const [volume, setVolume] = useState(() => {
+        const saved = localStorage.getItem('kjdj_volume');
+        return saved !== null ? parseFloat(saved) : 1.0;
+    });
+    const [showVolume, setShowVolume] = useState(false);
     const popoutWindowRef = useRef(null);
     const canPlay = status === 'ready' && !!audioSrc;
+
+    const initAudioContext = () => {
+        // Initialize Web Audio API context for visualization
+        if (audioRef.current && !audioContextRef.current) {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioContext();
+                const analyser = ctx.createAnalyser();
+                analyser.fftSize = 64; // Low resolution for visualizer bars (32 bins)
+
+                // Connect audio element to analyser and destination (speakers)
+                const source = ctx.createMediaElementSource(audioRef.current);
+                source.connect(analyser);
+                analyser.connect(ctx.destination);
+
+                audioContextRef.current = ctx;
+                sourceNodeRef.current = source;
+                analyserRef.current = analyser;
+
+                // Pass analyser up to parent component
+                if (onAnalyserReady) {
+                    onAnalyserReady(analyser);
+                }
+            } catch (err) {
+                console.error("Failed to setup audio context:", err);
+            }
+        }
+    };
+
+    useEffect(() => {
+        initAudioContext();
+    }, [onAnalyserReady]);
+
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.volume = volume;
+        }
+    }, [volume, audioSrc]);
 
     useEffect(() => {
         return () => {
@@ -219,6 +266,9 @@ const KaraokePlayer = React.memo(React.forwardRef(({
     }, [isPoppedOut, showNextUp, nextUp, status, songId]);
 
     const handlePlay = async () => {
+        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+            await audioContextRef.current.resume();
+        }
         if (!canPlay) {
             if (onLoadNext) {
                 const selection = await onLoadNext();
@@ -413,6 +463,37 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                     >
                         ⏹️
                     </button>
+
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowVolume(!showVolume)}
+                            className="bg-transparent text-xl text-zinc-100 hover:text-white"
+                            aria-label="Volume"
+                            title="Volume Control"
+                        >
+                            {volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}
+                        </button>
+                        {showVolume && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-3 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl flex items-center gap-3 z-50 min-w-[150px]">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.05"
+                                    value={volume}
+                                    onChange={(e) => {
+                                        const val = parseFloat(e.target.value);
+                                        setVolume(val);
+                                        localStorage.setItem('kjdj_volume', val);
+                                    }}
+                                    className="h-2 flex-1 appearance-none rounded-full bg-zinc-700 accent-emerald-500 cursor-pointer"
+                                />
+                                <span className="text-xs text-zinc-400 font-mono w-8 text-right">
+                                    {Math.round(volume * 100)}%
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div className="ml-auto min-w-0 text-left">
                     <div className="truncate text-sm font-semibold text-zinc-100">
@@ -443,7 +524,13 @@ const KaraokePlayer = React.memo(React.forwardRef(({
             <audio
                 ref={audioRef}
                 src={audioSrc}
-                onPlay={() => onPlaybackStatus?.('playing')}
+                onPlay={() => {
+                    initAudioContext();
+                    if (audioContextRef.current?.state === 'suspended') {
+                        audioContextRef.current.resume();
+                    }
+                    onPlaybackStatus?.('playing');
+                }}
                 onTimeUpdate={handleTimeUpdate}
                 onEnded={handleEnded}
                 onLoadedMetadata={handleTimeUpdate}
