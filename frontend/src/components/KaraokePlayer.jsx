@@ -89,19 +89,7 @@ const KaraokePlayer = React.memo(React.forwardRef(({
 
     useEffect(() => {
         const mediaEl = getMediaElement();
-        if (!mediaEl) return;
-        if (isVideoTrack) {
-            mediaEl.src = mediaSrc || '';
-        } else if (!isVideoTrack) {
-            mediaEl.src = mediaSrc || '';
-        }
-    }, [mediaSrc, isVideoTrack]);
 
-    useEffect(() => {
-        const mediaEl = getMediaElement();
-        if (mediaEl) {
-            mediaEl.volume = volume;
-        }
     }, [volume, mediaSrc, isVideoTrack]);
 
     useEffect(() => {
