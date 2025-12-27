@@ -1,115 +1,140 @@
 import { PACKETS_PER_SECTOR, SECTORS_PER_SECOND } from './constants';
-
-import CDGContext from './CDGContext';
+import CDGFrameBuffer from './CDGFrameBuffer';
 import CDGParser from './CDGParser';
+import CDGRenderer from './CDGRenderer';
+
+const FRAME_INTERVAL_MS = 1000 / (PACKETS_PER_SECTOR * SECTORS_PER_SECOND);
+
+const now = () =>
+  typeof performance !== 'undefined' && performance.now
+    ? performance.now()
+    : Date.now();
+
+const requestFrame = (cb) =>
+  typeof requestAnimationFrame === 'function'
+    ? window.requestAnimationFrame(cb)
+    : setTimeout(cb, FRAME_INTERVAL_MS);
+
+const cancelFrame = (id) =>
+  typeof cancelAnimationFrame === 'function'
+    ? window.cancelAnimationFrame(id)
+    : clearTimeout(id);
 
 /**
- * Calculates current time for the sake of determining playback intervals
- *
- * @return {number} milliseconds
- */
-function now() {
-  if (
-    typeof performance !== 'undefined' &&
-    typeof performance.now === 'function'
-  ) {
-    return performance.now();
-  }
-  return Date.now();
-}
-
-function requestFrame(callback) {
-  if (typeof requestAnimationFrame === 'function') {
-    return window.requestAnimationFrame(callback);
-  }
-  return setTimeout(callback, 25);
-}
-
-function cancelFrame(id) {
-  if (typeof cancelAnimationFrame === 'function') {
-    return cancelAnimationFrame(id);
-  }
-  return clearTimeout(id);
-}
-
-/**
- * CDG Player
- * ==========
- *
- * Provides an interface for interpreting CDG instructions and rendering the results to a canvas
+ * CDGPlayer coordinates parsing, buffering, and rendering of CDG packets.
+ * Public API is intentionally compatible with the previous implementation so the
+ * React KaraokePlayer can remain a drop-in consumer:
+ *  - new CDGPlayer({ contextOptions: { canvas, width, height } })
+ *  - load(cdgBytes)
+ *  - play() / stop()
+ *  - reset()
+ *  - sync(milliseconds)
  */
 export default class CDGPlayer {
-  /**
-   * CDG instructions
-   * @type {Array}
-   */
-  instructions = [];
+  constructor({
+    contextOptions = {},
+    parser = new CDGParser({}),
+    frameBuffer = new CDGFrameBuffer(contextOptions),
+    renderer = new CDGRenderer(contextOptions),
+    afterRender,
+  } = {}) {
+    this.parser = parser;
+    this.frameBuffer = frameBuffer;
+    this.renderer = renderer;
+    this.afterRender = afterRender;
 
-  /**
-   * Packet counter
-   * @type {Number}
-   */
-  pc = -1;
+    this.instructions = [];
+    this.pc = -1;
+    this.frameId = null;
+    this.pos = 0;
+    this.lastSyncPos = null;
+    this.lastTimestamp = null;
+  }
 
-  /**
-   * requestAnimationFrame unique ID
-   * @type {number}
-   */
-  frameId = null;
+  load(bytes) {
+    this.instructions = this.parser.parse(bytes);
+    this.reset();
+    return this;
+  }
 
-  /**
-   * Current time (ms)
-   * @type {Number}
-   */
-  pos = 0;
+  reset() {
+    this.stop();
+    this.pc = 0;
+    this.pos = 0;
+    this.lastSyncPos = null;
+    this.lastTimestamp = null;
+    this.frameBuffer.reset();
+    this.renderer.render(this.frameBuffer);
+    return this;
+  }
 
-  /**
-   * Last sync time (ms)
-   * @type {number}
-   */
-  lastSyncPos = null;
+  play() {
+    if (!this.frameId) {
+      this.frameId = requestFrame(this.update);
+      this.lastTimestamp = now();
+    }
+    return this;
+  }
 
-  /**
-   * Last sync timestamp
-   * @type {DOMHighResTimeStamp}
-   */
-  lastTimestamp = null;
+  stop() {
+    if (this.frameId) {
+      cancelFrame(this.frameId);
+    }
+    this.frameId = null;
+    this.lastSyncPos = null;
+    return this;
+  }
 
-  /**
-   * Steps through however many frames are necessary to bring the context up-to-date with
-   *
-   * @param  {DOMHighResTimeStamp} timestamp
-   * @return {self}
-   */
+  sync(ms) {
+    this.lastSyncPos = ms;
+    this.lastTimestamp = now();
+    return this;
+  }
+
+  step() {
+    if (this.pc >= 0 && this.pc < this.instructions.length) {
+      this.instructions[this.pc]?.apply(this.frameBuffer);
+      this.pc += 1;
+    } else {
+      this.pc = -1;
+      this.stop();
+    }
+  }
+
+  fastForward(count = 1) {
+    const target = this.pc + count;
+    while (this.pc >= 0 && this.pc < target) {
+      this.step();
+    }
+  }
+
+  render() {
+    this.renderer.render(this.frameBuffer);
+    this.afterRender?.(this.frameBuffer);
+  }
+
   update = (timestamp = now()) => {
-    // Packet counter says relax
     if (this.pc === -1) {
       return this;
     }
 
-    // go ahead and request the next frame
     this.frameId = requestFrame(this.update);
 
-    if (this.lastSyncPos) {
-      // last known audio position + time delta
-      this.pos = this.lastSyncPos + (timestamp - this.lastTimestamp);
+    const lastTimestamp = this.lastTimestamp ?? timestamp;
+    if (this.lastSyncPos != null) {
+      this.pos = this.lastSyncPos + (timestamp - lastTimestamp);
     } else {
-      // time delta only (unsynced)
-      this.pos += timestamp - this.lastTimestamp;
-      this.lastTimestamp = timestamp;
+      this.pos += timestamp - lastTimestamp;
     }
+    this.lastTimestamp = timestamp;
 
-    // determine packet we should be at, based on spec
-    // of 4 packets per sector @ 75 sectors per second
     const newPc = Math.floor(
       SECTORS_PER_SECOND * PACKETS_PER_SECTOR * (this.pos / 1000)
     );
 
-    // If we've gone backward significantly (or at all), reset to start
-    // and let the fast-forward catch up
     if (newPc < this.pc) {
       this.pc = 0;
-      this.context.reset();
+      this.frameBuffer.reset();
     }
 
     const ffAmt = newPc - this.pc;
@@ -120,149 +145,4 @@ export default class CDGPlayer {
 
     return this;
   };
-
-  /**
-   * Creates CDGPlayer instance
-   *
-   * @constructor
-   * @param  {Object} [options] - CDG player options
-   * @param  {Object} [options.contextOptions] - options for the CDG context
-   * @param  {function} [options.afterRender] - function to call after rendering a frame
-   */
-  constructor({
-    contextOptions = {},
-    context = this.createContext(contextOptions),
-    afterRender,
-  } = {}) {
-    this.context = context;
-    this.afterRender = afterRender;
-  }
-
-  /**
-   * Creates a CDG context instance for rendering
-   *
-   * @param  {Object} [options] - parameters passed to the context constructor
-   * @return {CDGContext} context instance
-   */
-  createContext(options = {}) {
-    return new CDGContext(options);
-  }
-
-  /**
-   * Loads CDG data and parses the instructions
-   *
-   * @param  {string} data - CDG instruction data
-   * @return {self}
-   */
-  load(data) {
-    const parser = new CDGParser();
-    this.instructions = parser.parseInstructions(data);
-    this.reset();
-    return this;
-  }
-
-  /**
-   * Resets the counters
-   *
-   * @return {self}
-   */
-  reset() {
-    this.pc = 0;
-    this.pos = 0;
-    this.lastSyncPos = null;
-    this.context.reset();
-    return this;
-  }
-
-  /**
-   * Renders the CDG context frame
-   * @return {self}
-   */
-  render() {
-    this.context.renderFrame();
-    this.afterRender && this.afterRender(this.context);
-    return this;
-  }
-
-  /**
-   * Executes an instruction on this player's context
-   *
-   * @param  {CDGInstruction} instruction - CDG instruction to run
-   * @return {self}
-   */
-  executeInstruction(instruction) {
-    if (instruction && typeof instruction.execute === 'function') {
-      instruction.execute(this.context);
-    }
-    return this;
-  }
-
-  /**
-   * Executes the next CDG instruction packet
-   *
-   * @return {self}
-   */
-  step() {
-    if (this.pc >= 0 && this.pc < this.instructions.length) {
-      this.executeInstruction(this.instructions[this.pc]);
-      this.pc += 1;
-    } else {
-      this.pc = -1;
-      this.stop();
-    }
-    return this;
-  }
-
-  /**
-   * Executes several CDG instructions
-   *
-   * @param  {number} [count]
-   * @return {self}
-   */
-  fastForward(count = 1) {
-    const max = this.pc + count;
-    while (this.pc >= 0 && this.pc < max) {
-      this.step();
-    }
-    return this;
-  }
-
-  /**
-   * Starts CDG playback
-   *
-   * @return {self}
-   */
-  play() {
-    if (!this.frameId) {
-      this.frameId = requestFrame(this.update);
-      this.lastTimestamp = now();
-    }
-    return this;
-  }
-
-  /**
-   * Stops CDG playback
-   *
-   * @return {self}
-   */
-  stop() {
-    cancelFrame(this.frameId);
-    this.frameId = null;
-    this.lastSyncPos = null;
-    return this;
-  }
-
-  /**
-   * Syncs playback with a timestamp
-   *
-   * This is used to sync with the current time of the audio track
-   *
-   * @param  {number} ms - sync timestamp
-   * @return {self}
-   */
-  sync(ms) {
-    this.lastSyncPos = ms;
-    this.lastTimestamp = now();
-    return this;
-  }
 }
