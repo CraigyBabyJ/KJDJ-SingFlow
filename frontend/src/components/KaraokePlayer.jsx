@@ -89,9 +89,7 @@ const KaraokePlayer = React.memo(React.forwardRef(({
 
     useEffect(() => {
         const mediaEl = getMediaElement();
-        if (mediaEl) {
-            mediaEl.volume = volume;
-        }
+
     }, [volume, mediaSrc, isVideoTrack]);
 
     useEffect(() => {
@@ -107,8 +105,9 @@ const KaraokePlayer = React.memo(React.forwardRef(({
 
     const sendDisplayState = (type = 'STATE') => {
         if (!popoutWindowRef.current) return;
-        const playbackState = audioRef.current
-            ? (audioRef.current.paused ? 'paused' : 'playing')
+        const mediaEl = getMediaElement();
+        const playbackState = mediaEl
+            ? (mediaEl.paused ? 'paused' : 'playing')
             : 'stopped';
         popoutWindowRef.current.postMessage({
             type: `KJDJ_${type}`,
@@ -149,8 +148,9 @@ const KaraokePlayer = React.memo(React.forwardRef(({
         },
         resyncDisplay: () => {
             sendDisplayStateBurst();
-            if (audioRef.current && cdgPlayerRef.current) {
-                cdgPlayerRef.current.sync(audioRef.current.currentTime * 1000);
+            const mediaEl = getMediaElement();
+            if (mediaEl && cdgPlayerRef.current) {
+                cdgPlayerRef.current.sync(mediaEl.currentTime * 1000);
             }
         },
     }));
@@ -531,8 +531,9 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                         onClick={async () => {
                             const selection = await onLoadNext?.();
                             if (!selection) {
-                                if (audioRef.current) {
-                                    audioRef.current.pause();
+                                const mediaEl = getMediaElement();
+                                if (mediaEl) {
+                                    mediaEl.pause();
                                 }
                                 if (cdgPlayerRef.current) {
                                     cdgPlayerRef.current.stop();
