@@ -1,0 +1,41 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+header {
+  border-bottom: 1px solid #444;
+  padding-bottom: 2rem;
+}
+
+.status-bar {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background-color: #1a1a1a;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.status-indicator {
+  color: #646cff;
+  font-weight: bold;
+}
+
+.card {
+  padding: 2em;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+p {
+  line-height: 1.6;
+}

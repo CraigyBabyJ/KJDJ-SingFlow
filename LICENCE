@@ -1,0 +1,31 @@
+PolyForm Noncommercial License 1.0.0
+
+https://polyformproject.org/licenses/noncommercial/1.0.0/
+
+Copyright (c) 2025 CraigyBabyJ
+
+This license applies to all original source code, configuration,
+documentation, UI, server logic, orchestration, and infrastructure
+components contained in this repository, EXCLUDING third-party
+dependencies and components listed in NOTICE or THIRD_PARTY_LICENSES.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of the Software, to use, copy, modify, and distribute the Software for
+noncommercial purposes only, subject to the following conditions:
+
+1. The Software may not be sold, sublicensed, or offered as part of a
+   commercial product or service without explicit written permission
+   from the copyright holder.
+
+2. Commercial use includes, but is not limited to:
+   - Selling the Software or derivative works
+   - Offering hosted access in exchange for payment
+   - Bundling the Software into paid products or services
+   - White-labeling or rebranding for commercial deployment
+
+3. This license does NOT apply to third-party components included in this
+   repository. Such components are governed by their own licenses.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.

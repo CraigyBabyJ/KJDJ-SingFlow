@@ -1,0 +1,18 @@
+KJDJ SingFlow — License Notice
+
+This repository contains a combination of original code authored by
+CraigyBabyJ and third-party components authored by their respective owners.
+
+The following applies:
+
+• Original code (hosting logic, orchestration, UI, backend services,
+  configuration, and documentation) is licensed under the
+  PolyForm Noncommercial License.
+
+• Certain components, including CDG playback and rendering code,
+  are third-party works and are NOT covered by the PolyForm license.
+
+Those components retain their original licenses and copyrights.
+
+Nothing in this repository is intended to restrict the rights granted
+by those third-party licenses.
