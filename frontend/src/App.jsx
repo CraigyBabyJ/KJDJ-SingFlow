@@ -6,7 +6,13 @@ import SingerRequestPage from './components/SingerRequestPage';
 import JoinPage from './components/JoinPage';
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(() => {
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+    }
+    return storedToken;
+  });
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
   const [path, setPath] = useState(window.location.pathname || '/');
   
@@ -52,6 +58,8 @@ function App() {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       fetchRotationData();
       fetchCurrentUser();
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
     }
   }, [token]);
 

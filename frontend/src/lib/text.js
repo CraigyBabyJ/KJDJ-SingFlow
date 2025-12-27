@@ -18,5 +18,7 @@ export const isVocalTrack = (song) => {
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
-  return haystack.includes('vocal');
+  // Only filter explicit "vocal version" style tracks; avoid brand names like "Vocal-Star".
+  return /\b(vocal|vocals)\s+(version|only)\b/.test(haystack) ||
+    /[\[(]\s*vocal(s)?\s*[\])]/.test(haystack);
 };

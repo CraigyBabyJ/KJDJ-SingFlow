@@ -18,6 +18,21 @@ const PopoutWindow = ({ children, onClose, onWindowReady, title = 'Karaoke Scree
     if (onWindowReady) onWindowReady(win);
     win.document.title = title;
 
+    const copyStyles = () => {
+        const head = win.document.head;
+        const sourceHead = document.head;
+        const styleNodes = sourceHead.querySelectorAll('link[rel="stylesheet"], style');
+        styleNodes.forEach((node) => {
+            try {
+                head.appendChild(node.cloneNode(true));
+            } catch (err) {
+                // Ignore cross-origin styles we can't clone.
+            }
+        });
+    };
+
+    copyStyles();
+
     // --- HELPER FUNCTIONS ---
     const setWindowSize = (percent) => {
         if (!win) return;
@@ -60,7 +75,7 @@ const PopoutWindow = ({ children, onClose, onWindowReady, title = 'Karaoke Scree
     };
 
     const menuWrapper = win.document.createElement('div');
-    menuWrapper.style.position = 'absolute';
+    menuWrapper.style.position = 'fixed';
     menuWrapper.style.top = '12px';
     menuWrapper.style.right = '12px';
     menuWrapper.style.zIndex = '9999';
@@ -142,19 +157,15 @@ const PopoutWindow = ({ children, onClose, onWindowReady, title = 'Karaoke Scree
     div.style.justifyContent = 'center';
     div.style.alignItems = 'center';
     div.style.backgroundColor = 'black';
-    div.style.position = 'absolute';
-    div.style.top = '0';
-    div.style.left = '0';
+    div.style.position = 'fixed';
+    div.style.inset = '0';
     win.document.body.appendChild(div);
     setContainer(div);
 
     // Create overlay for state display (next up / idle)
     const overlay = win.document.createElement('div');
-    overlay.style.position = 'absolute';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
     overlay.style.display = 'flex';
     overlay.style.flexDirection = 'column';
     overlay.style.alignItems = 'center';
@@ -167,6 +178,10 @@ const PopoutWindow = ({ children, onClose, onWindowReady, title = 'Karaoke Scree
     win.document.body.appendChild(overlay);
 
     // Basic Styles
+    win.document.documentElement.style.width = '100%';
+    win.document.documentElement.style.height = '100%';
+    win.document.body.style.width = '100%';
+    win.document.body.style.height = '100%';
     win.document.body.style.margin = '0';
     win.document.body.style.padding = '0';
     win.document.body.style.overflow = 'hidden';

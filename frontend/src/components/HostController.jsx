@@ -285,9 +285,16 @@ const HostController = ({
                         )}
                         <div className="hidden sm:block">
                             {libraryStatus?.isScanning
-                                ? `Scanning ${libraryStatus.scanProgress?.current || 0}/${libraryStatus.scanProgress?.total || 0}`
-                                : `Library: ${libraryStatus?.songCount ?? 0} songs`}
+                                ? `Scanning ${libraryStatus.scanProgress?.current ?? 0}/${libraryStatus.scanProgress?.total ?? 0}`
+                                : `Library: ${libraryStatus?.songCount ?? 0} songs total`}
                         </div>
+                        <button
+                            onClick={handleRefreshLibrary}
+                            disabled={libraryStatus?.isScanning}
+                            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-500"
+                        >
+                            Refresh Lib
+                        </button>
                         <button
                             onClick={onLogout}
                             className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"

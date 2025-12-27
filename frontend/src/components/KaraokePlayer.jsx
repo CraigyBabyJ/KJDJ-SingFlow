@@ -24,12 +24,16 @@ const KaraokePlayer = React.memo(React.forwardRef(({
     const cdgPlayerRef = useRef(null);
     const cdgDataRef = useRef(null);
     const audioContextRef = useRef(null);
-    const sourceNodeRef = useRef(null);
+    const audioSourceNodeRef = useRef(null);
+    const videoSourceNodeRef = useRef(null);
     const analyserRef = useRef(null);
+    const lastKnownTimeRef = useRef(0);
+    const lastPlayStateRef = useRef(false);
     const [status, setStatus] = useState('idle'); // idle, loading, ready, error
     const [mediaSrc, setMediaSrc] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [isPoppedOut, setIsPoppedOut] = useState(false);
+    const [needsUserResume, setNeedsUserResume] = useState(false);
     const [timeState, setTimeState] = useState({ current: 0, duration: 0 });
     const [isPlaying, setIsPlaying] = useState(false);
     const [volume, setVolume] = useState(() => {
@@ -41,6 +45,9 @@ const KaraokePlayer = React.memo(React.forwardRef(({
     const canPlay = status === 'ready' && !!mediaSrc;
     const isVideoTrack = ((currentSelection?.media_type || currentSelection?.mediaType || '').toLowerCase() === 'mp4') ||
         (currentSelection?.file_path?.toLowerCase().endsWith('.mp4'));
+    const pendingSeekRef = useRef(null);
+    const resumeMutedRef = useRef(false);
+    const pendingAutoPlayRef = useRef(false);
 
     const getMediaElement = () => (isVideoTrack ? videoRef.current : audioRef.current);
 
@@ -54,21 +61,27 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                 const analyser = analyserRef.current || ctx.createAnalyser();
                 analyser.fftSize = 64; // Low resolution for visualizer bars (32 bins)
 
-                if (sourceNodeRef.current && sourceNodeRef.current.mediaElement !== mediaEl) {
-                    try {
-                        sourceNodeRef.current.disconnect();
-                    } catch (e) {
-                        // noop
-                    }
-                    sourceNodeRef.current = null;
+                const sourceRef = isVideoTrack ? videoSourceNodeRef : audioSourceNodeRef;
+                const otherSourceRef = isVideoTrack ? audioSourceNodeRef : videoSourceNodeRef;
+
+                if (!sourceRef.current) {
+                    sourceRef.current = ctx.createMediaElementSource(mediaEl);
                 }
 
-                if (!sourceNodeRef.current) {
-                    const source = ctx.createMediaElementSource(mediaEl);
-                    source.connect(analyser);
-                    analyser.connect(ctx.destination);
-                    sourceNodeRef.current = source;
+                try {
+                    otherSourceRef.current?.disconnect(analyser);
+                } catch (e) {
+                    // noop
                 }
+
+                try {
+                    sourceRef.current.disconnect(analyser);
+                } catch (e) {
+                    // noop
+                }
+
+                sourceRef.current.connect(analyser);
+                analyser.connect(ctx.destination);
 
                 audioContextRef.current = ctx;
                 analyserRef.current = analyser;
@@ -86,6 +99,42 @@ const KaraokePlayer = React.memo(React.forwardRef(({
     useEffect(() => {
         initAudioContext();
     }, [onAnalyserReady, isVideoTrack, mediaSrc]);
+
+    useEffect(() => {
+        if (!pendingAutoPlayRef.current || !canPlay) return;
+        pendingAutoPlayRef.current = false;
+        handlePlay();
+    }, [canPlay, mediaSrc, isVideoTrack]);
+
+    useEffect(() => {
+        if (!canPlay) return;
+        const lastTime = lastKnownTimeRef.current;
+        if (Number.isFinite(lastTime) && lastTime > 0) {
+            pendingSeekRef.current = Math.min(lastTime, lastTime);
+        }
+
+        const mediaEl = getMediaElement();
+        if (!mediaEl) return;
+        if (pendingSeekRef.current != null && mediaEl.readyState >= 1) {
+            const current = mediaEl.currentTime || 0;
+            if (Math.abs(current - pendingSeekRef.current) > 0.5) {
+                mediaEl.currentTime = Math.min(pendingSeekRef.current, mediaEl.duration || pendingSeekRef.current);
+            }
+            pendingSeekRef.current = null;
+        }
+
+        if (lastPlayStateRef.current && mediaEl.readyState >= 1) {
+            mediaEl.play().then(() => {
+                setNeedsUserResume(false);
+            }).catch(() => {
+                setNeedsUserResume(true);
+            });
+            if (!isVideoTrack && cdgPlayerRef.current && cdgDataRef.current) {
+                cdgPlayerRef.current.play();
+                cdgPlayerRef.current.sync((mediaEl.currentTime || 0) * 1000);
+            }
+        }
+    }, [isPoppedOut, mediaSrc, isVideoTrack, canPlay]);
 
     useEffect(() => {
         const mediaEl = getMediaElement();
@@ -191,6 +240,11 @@ const KaraokePlayer = React.memo(React.forwardRef(({
             setErrorMsg(null);
             setMediaSrc(null);
             cdgDataRef.current = null;
+            lastKnownTimeRef.current = 0;
+            pendingSeekRef.current = null;
+            setTimeState({ current: 0, duration: 0 });
+            setIsPlaying(false);
+            setNeedsUserResume(false);
             onPlaybackStatus?.('paused');
 
             [audioRef.current, videoRef.current].forEach((el) => {
@@ -315,8 +369,12 @@ const KaraokePlayer = React.memo(React.forwardRef(({
         }
         if (!canPlay) {
             if (onLoadNext) {
+                pendingAutoPlayRef.current = true;
+                lastPlayStateRef.current = true;
                 const selection = await onLoadNext();
                 if (!selection) {
+                    pendingAutoPlayRef.current = false;
+                    lastPlayStateRef.current = false;
                     return;
                 }
             }
@@ -324,8 +382,11 @@ const KaraokePlayer = React.memo(React.forwardRef(({
         }
         if (cdgPlayerRef.current) cdgPlayerRef.current.play();
         const mediaEl = getMediaElement();
-        if (mediaEl) mediaEl.play();
+        if (mediaEl) {
+            mediaEl.play().then(() => setNeedsUserResume(false)).catch(() => setNeedsUserResume(true));
+        }
         setIsPlaying(true);
+        lastPlayStateRef.current = true;
         onPlaybackStatus?.('playing');
     };
 
@@ -334,6 +395,7 @@ const KaraokePlayer = React.memo(React.forwardRef(({
         const mediaEl = getMediaElement();
         if (mediaEl) mediaEl.pause();
         setIsPlaying(false);
+        lastPlayStateRef.current = false;
         onPlaybackStatus?.('paused');
     };
 
@@ -350,27 +412,86 @@ const KaraokePlayer = React.memo(React.forwardRef(({
         setTimeState({ current: 0, duration: mediaEl?.duration || 0 });
         onTimeUpdate?.(0, mediaEl?.duration || 0);
         setIsPlaying(false);
+        lastPlayStateRef.current = false;
         onPlaybackStatus?.('stopped');
     };
 
     const handleMediaPlayEvent = () => {
         initAudioContext();
+        setNeedsUserResume(false);
+        if (cdgPlayerRef.current && cdgDataRef.current) {
+            cdgPlayerRef.current.play();
+            const mediaEl = getMediaElement();
+            if (mediaEl) {
+                cdgPlayerRef.current.sync(mediaEl.currentTime * 1000);
+            }
+        }
         if (audioContextRef.current?.state === 'suspended') {
             audioContextRef.current.resume();
         }
         setIsPlaying(true);
+        lastPlayStateRef.current = true;
         onPlaybackStatus?.('playing');
+    };
+
+    const handleMediaPauseEvent = () => {
+        if (cdgPlayerRef.current) {
+            cdgPlayerRef.current.stop();
+        }
+        setIsPlaying(false);
+        lastPlayStateRef.current = false;
+        onPlaybackStatus?.('paused');
     };
 
     const handleTimeUpdate = () => {
         const mediaEl = getMediaElement();
         if (!mediaEl) return;
         const currentTime = mediaEl.currentTime;
+        lastKnownTimeRef.current = currentTime;
         if (cdgPlayerRef.current && cdgDataRef.current) {
             cdgPlayerRef.current.sync(currentTime * 1000);
         }
         setTimeState({ current: currentTime, duration: mediaEl.duration || 0 });
         onTimeUpdate?.(currentTime, mediaEl.duration || 0);
+    };
+
+    const handleLoadedMetadata = () => {
+        const mediaEl = getMediaElement();
+        if (!mediaEl) return;
+        if (pendingSeekRef.current != null) {
+            mediaEl.currentTime = pendingSeekRef.current;
+            pendingSeekRef.current = null;
+        }
+        if (lastPlayStateRef.current) {
+            const priorMuted = mediaEl.muted;
+            mediaEl.play().then(() => {
+                setNeedsUserResume(false);
+            }).catch((err) => {
+                if (err?.name === 'NotAllowedError') {
+                    resumeMutedRef.current = priorMuted;
+                    mediaEl.muted = true;
+                    mediaEl.play().then(() => {
+                        setTimeout(() => {
+                            mediaEl.muted = resumeMutedRef.current;
+                        }, 0);
+                        setNeedsUserResume(false);
+                    }).catch(() => {
+                        setIsPlaying(false);
+                        lastPlayStateRef.current = false;
+                        setNeedsUserResume(true);
+                    });
+                } else {
+                    setIsPlaying(false);
+                    lastPlayStateRef.current = false;
+                    setNeedsUserResume(true);
+                }
+            });
+            if (!isVideoTrack && cdgPlayerRef.current && cdgDataRef.current) {
+                cdgPlayerRef.current.play();
+                cdgPlayerRef.current.sync((mediaEl.currentTime || 0) * 1000);
+            }
+        }
+        handleTimeUpdate();
     };
 
     const handleEnded = () => {
@@ -383,6 +504,7 @@ const KaraokePlayer = React.memo(React.forwardRef(({
             cdgPlayerRef.current.reset();
         }
         setIsPlaying(false);
+        lastPlayStateRef.current = false;
         onPlaybackStatus?.('stopped');
         if (onEnded) onEnded();
     };
@@ -463,27 +585,38 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                 >
                     <div className="flex h-full w-full items-center justify-center bg-black">
                         {status === 'idle' || status === 'loading' ? renderIdle() : (
-                            isVideoTrack ? (
-                                <video
-                                    ref={videoRef}
-                                    src={isVideoTrack ? mediaSrc : undefined}
-                                    width={300}
-                                    height={216}
-                                    className="h-full w-full object-contain"
-                                    playsInline
-                                    onPlay={handleMediaPlayEvent}
-                                    onTimeUpdate={handleTimeUpdate}
-                                    onEnded={handleEnded}
-                                    onLoadedMetadata={handleTimeUpdate}
-                                />
-                            ) : (
-                                <canvas
-                                    ref={setCanvasElement}
-                                    width={300}
-                                    height={216}
-                                    style={{ width: '100%', height: '100%', display: 'block' }}
-                                />
-                            )
+                            <div className="relative h-full w-full">
+                                {isVideoTrack ? (
+                                    <video
+                                        ref={videoRef}
+                                        src={isVideoTrack ? mediaSrc : undefined}
+                                        className="h-full w-full object-contain"
+                                        playsInline
+                                        onPlay={handleMediaPlayEvent}
+                                        onPause={handleMediaPauseEvent}
+                                        onTimeUpdate={handleTimeUpdate}
+                                        onEnded={handleEnded}
+                                        onLoadedMetadata={handleLoadedMetadata}
+                                    />
+                                ) : (
+                                    <canvas
+                                        ref={setCanvasElement}
+                                        width={300}
+                                        height={216}
+                                        style={{ width: '100%', height: '100%', display: 'block' }}
+                                    />
+                                )}
+                                {(needsUserResume || (!isPlaying && canPlay)) && (
+                                    <button
+                                        type="button"
+                                        onClick={handlePlay}
+                                        className="absolute inset-0 flex items-center justify-center bg-black/60 text-2xl text-white"
+                                        aria-label="Resume playback"
+                                    >
+                                        Click to resume ▶️
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </div>
                 </PopoutWindow>
@@ -500,9 +633,10 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                                     className="h-full w-full object-contain"
                                     playsInline
                                     onPlay={handleMediaPlayEvent}
+                                    onPause={handleMediaPauseEvent}
                                     onTimeUpdate={handleTimeUpdate}
                                     onEnded={handleEnded}
-                                    onLoadedMetadata={handleTimeUpdate}
+                                    onLoadedMetadata={handleLoadedMetadata}
                                 />
                             ) : (
                                 <canvas
@@ -616,9 +750,10 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                 ref={audioRef}
                 src={!isVideoTrack ? mediaSrc : undefined}
                 onPlay={handleMediaPlayEvent}
+                onPause={handleMediaPauseEvent}
                 onTimeUpdate={handleTimeUpdate}
                 onEnded={handleEnded}
-                onLoadedMetadata={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
                 className="hidden"
             />
         </div>
