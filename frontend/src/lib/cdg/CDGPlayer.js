@@ -138,11 +138,7 @@ export default class CDGPlayer {
 
     if (newPc < this.pc) {
       this.pc = 0;
-      // Realign the buffer to the latest sync position so seeking backwards
-      // doesn’t fast-forward from a stale timestamp, which caused visible stutter.
-      this.pos =
-        this.lastSyncPos ??
-        (newPc * 1000) / (SECTORS_PER_SECOND * PACKETS_PER_SECTOR);
+
       this.frameBuffer.reset();
     }
 
