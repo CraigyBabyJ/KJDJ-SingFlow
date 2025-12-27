@@ -45,6 +45,7 @@ const getQueue = async (hostId, singerId = null) => {
             so.artist, 
             so.title,
             so.file_path,
+            so.media_type,
             u.username as requested_by
         FROM queue_entries q
         JOIN singers s ON q.singer_id = s.id

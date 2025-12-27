@@ -53,9 +53,9 @@ const scanLibrary = async () => {
     const startTime = Date.now();
 
     try {
-        // Find all zip files recursively
+        // Find all supported media files recursively
         // glob returns a Promise in v10+ when used this way
-        const files = await glob('**/*.zip', { cwd: mediaPath });
+        const files = await glob('**/*.{zip,mp4}', { cwd: mediaPath, nocase: true });
         console.log(`Found ${files.length} files. Processing...`);
         
         scanProgress = { total: files.length, current: 0, currentFile: '' };
@@ -77,6 +77,8 @@ const scanLibrary = async () => {
         const processFile = async (file) => {
             // scanProgress.currentFile = file; // Disabled to reduce overhead and UI clutter
             const fullPath = path.join(mediaPath, file);
+            const ext = path.extname(file).toLowerCase();
+            const mediaType = ext === '.mp4' ? 'mp4' : 'zip';
             let stats;
 
             try {
@@ -104,15 +106,15 @@ const scanLibrary = async () => {
                 
                 // Optimized: return an async function that does the DB check/update
                 return async () => {
-                    const currentRow = await dbGet("SELECT size, mtime FROM songs WHERE id = ?", [existingId]);
-                    if (currentRow && (currentRow.size !== size || currentRow.mtime !== mtime)) {
-                        await dbRun("UPDATE songs SET size = ?, mtime = ?, active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [size, mtime, existingId]);
+                    const currentRow = await dbGet("SELECT size, mtime, media_type FROM songs WHERE id = ?", [existingId]);
+                    if (currentRow && (currentRow.size !== size || currentRow.mtime !== mtime || currentRow.media_type !== mediaType)) {
+                        await dbRun("UPDATE songs SET size = ?, mtime = ?, media_type = ?, active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [size, mtime, mediaType, existingId]);
                         updatedCount++;
                     }
                 };
             } else {
                 // New file logic
-                const filename = path.basename(file, '.zip');
+                const filename = path.basename(file, ext);
                 const parts = filename.split(' - ');
                 let artist = 'Unknown';
                 let title = filename;
@@ -124,12 +126,12 @@ const scanLibrary = async () => {
                 return async () => {
                     const inactiveRow = await dbGet("SELECT id FROM songs WHERE file_path = ?", [file]);
                     if (inactiveRow) {
-                        await dbRun("UPDATE songs SET artist = ?, title = ?, size = ?, mtime = ?, active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", 
-                            [artist, title, size, mtime, inactiveRow.id]);
+                        await dbRun("UPDATE songs SET artist = ?, title = ?, size = ?, mtime = ?, media_type = ?, active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", 
+                            [artist, title, size, mtime, mediaType, inactiveRow.id]);
                         updatedCount++;
                     } else {
-                        await dbRun("INSERT INTO songs (artist, title, file_path, size, mtime, active) VALUES (?, ?, ?, ?, ?, 1)",
-                            [artist, title, file, size, mtime]);
+                        await dbRun("INSERT INTO songs (artist, title, file_path, size, mtime, media_type, active) VALUES (?, ?, ?, ?, ?, ?, 1)",
+                            [artist, title, file, size, mtime, mediaType]);
                         newCount++;
                     }
                 };
@@ -257,7 +259,7 @@ const searchSongs = async (query) => {
     const whereClause = conditions.join(' AND ');
 
     const sql = `
-        SELECT id, artist, title, file_path 
+        SELECT id, artist, title, file_path, media_type 
         FROM songs 
         WHERE active = 1 
         AND ${whereClause}
