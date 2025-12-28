@@ -1,0 +1,16 @@
+[Unit]
+Description=KJDJ Backend
+After=network.target
+
+[Service]
+Type=simple
+User=craig
+Group=craig
+WorkingDirectory=/home/craig/projects/kjdj/backend
+Environment=NODE_ENV=production
+ExecStart=/home/craig/projects/kjdj/backend/scripts/start-backend.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

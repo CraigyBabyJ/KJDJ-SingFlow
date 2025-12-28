@@ -1,0 +1,17 @@
+[Unit]
+Description=KJDJ Frontend (Vite Preview)
+After=network.target
+
+[Service]
+Type=simple
+User=craig
+Group=craig
+WorkingDirectory=/home/craig/projects/kjdj/frontend
+Environment=NODE_ENV=production
+ExecStartPre=/usr/bin/env npm run build
+ExecStart=/usr/bin/env npm run preview -- --host 0.0.0.0 --port 5180
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

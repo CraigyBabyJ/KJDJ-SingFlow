@@ -23,6 +23,9 @@ The backend is configured via `backend/.env`. Required and optional values:
 - `HOST_INVITE_CODE` (optional): Invite code for HOST/admin registration (defaults to `6969`).
 - `JWT_SECRET` (optional): JWT signing secret (defaults to `your-secret-key-change-this-in-prod`).
 - `DB_PATH` (optional): Relative path to the SQLite DB (defaults to `./db/kjdj.db`).
+- `DOWNLOAD_TOKEN_SECRET` (optional): HMAC secret used for short-lived media download tokens (defaults to `JWT_SECRET`).
+- `DOWNLOAD_TOKEN_TTL` (optional): Token lifetime in seconds (defaults to `60`).
+- `DOWNLOAD_RATE_LIMIT` (optional): Max library downloads per host per minute (defaults to `30`).
 
 ## Running the Project
 
@@ -102,3 +105,17 @@ Example for this machine (installed in `craig` crontab):
 ```bash
 15 3 * * * /home/craig/projects/kjdj/backend/scripts/yt-dlp-upgrade.sh >> /home/craig/yt-dlp-upgrade.log 2>&1
 ```
+
+## Deployment Notes & Known Fixes
+
+- **Backend systemd restarts:** use `backend/scripts/start-backend.sh` as the systemd `ExecStart`. The helper reads `backend/.env` to find `PORT`, kills any stale `node src/server.js` still bound there, and then runs `npm start`. Without it, `kjdj-backend.service` would occasionally fail with `EADDRINUSE` after a crash or manual kill. Example unit snippet:
+  ```ini
+  ExecStart=/home/craig/projects/kjdj/backend/scripts/start-backend.sh
+  Restart=on-failure
+  RestartSec=5
+  ```
+  Remember to copy the updated unit to `/etc/systemd/system`, run `sudo systemctl daemon-reload`, and restart the service after any changes.
+- **Deck pop-out + CDG:** the React deck used to reload CDG ZIPs whenever the pop-out window toggled, causing songs to restart. The loader effect no longer depends on transient canvas mounts, so CDG playback now behaves like MP4 when docking/undocking the deck.
+- **Volume slider regression:** the slider previously only updated component state; volume changes now apply to both `<audio>` and `<video>` elements immediately and persist via `localStorage`.
+- **Media download hardening:** `/api/library/songs/:id/authorize` now issues short-lived signed tokens that must accompany `/download` requests, downloads are rate-limited per host, and responses set `Cache-Control: no-store`. If a host reports 403/429 errors while loading tracks, check these guards and adjust `DOWNLOAD_TOKEN_TTL` / `DOWNLOAD_RATE_LIMIT` as needed.
+- **Visualizer silent for MP4 deck:** the analyser now rebinds when the active media element changes (e.g., pop-out swaps `<video>` tags). If the spectrum analyzer stops updating after toggling the deck, ensure the `initAudioContext` logic in `frontend/src/components/KaraokePlayer.jsx` is intact.

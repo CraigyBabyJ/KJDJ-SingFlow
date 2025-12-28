@@ -31,10 +31,10 @@ const SortableQueueItem = ({ item, onAction, onPlayItem, dragDisabled }) => {
                 >
                     ☰
                 </button>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                     <div className="text-base font-semibold text-zinc-100">{item.singer_name}</div>
                     <div
-                        className="text-sm text-zinc-300 truncate max-w-[440px]"
+                        className="text-sm text-zinc-300 truncate"
                         title={item.file_path || undefined}
                     >
                         {toTitleCase(item.title)} — {toTitleCase(item.artist)}

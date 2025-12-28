@@ -21,11 +21,14 @@ const KaraokePlayer = React.memo(React.forwardRef(({
     const audioRef = useRef(null);
     const videoRef = useRef(null);
     const [canvasElement, setCanvasElement] = useState(null);
+    const canvasRef = useRef(null);
     const cdgPlayerRef = useRef(null);
     const cdgDataRef = useRef(null);
     const audioContextRef = useRef(null);
     const audioSourceNodeRef = useRef(null);
     const videoSourceNodeRef = useRef(null);
+    const audioSourceElementRef = useRef(null);
+    const videoSourceElementRef = useRef(null);
     const analyserRef = useRef(null);
     const lastKnownTimeRef = useRef(0);
     const lastPlayStateRef = useRef(false);
@@ -53,52 +56,61 @@ const KaraokePlayer = React.memo(React.forwardRef(({
 
     const initAudioContext = () => {
         const mediaEl = getMediaElement();
-        // Initialize Web Audio API context for visualization
-        if (mediaEl) {
-            try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                const ctx = audioContextRef.current || new AudioContext();
-                const analyser = analyserRef.current || ctx.createAnalyser();
-                analyser.fftSize = 64; // Low resolution for visualizer bars (32 bins)
+        if (!mediaEl) return;
 
-                const sourceRef = isVideoTrack ? videoSourceNodeRef : audioSourceNodeRef;
-                const otherSourceRef = isVideoTrack ? audioSourceNodeRef : videoSourceNodeRef;
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const ctx = audioContextRef.current || new AudioContext();
+            const analyser = analyserRef.current || ctx.createAnalyser();
+            analyser.fftSize = 64;
 
-                if (!sourceRef.current) {
-                    sourceRef.current = ctx.createMediaElementSource(mediaEl);
-                }
+            const sourceNodeRef = isVideoTrack ? videoSourceNodeRef : audioSourceNodeRef;
+            const otherSourceNodeRef = isVideoTrack ? audioSourceNodeRef : videoSourceNodeRef;
+            const sourceElementRef = isVideoTrack ? videoSourceElementRef : audioSourceElementRef;
 
+            if (!sourceNodeRef.current || sourceElementRef.current !== mediaEl) {
                 try {
-                    otherSourceRef.current?.disconnect(analyser);
+                    sourceNodeRef.current?.disconnect();
                 } catch (e) {
                     // noop
                 }
-
-                try {
-                    sourceRef.current.disconnect(analyser);
-                } catch (e) {
-                    // noop
-                }
-
-                sourceRef.current.connect(analyser);
-                analyser.connect(ctx.destination);
-
-                audioContextRef.current = ctx;
-                analyserRef.current = analyser;
-
-                // Pass analyser up to parent component
-                if (onAnalyserReady) {
-                    onAnalyserReady(analyser);
-                }
-            } catch (err) {
-                console.error("Failed to setup audio context:", err);
+                sourceNodeRef.current = ctx.createMediaElementSource(mediaEl);
+                sourceElementRef.current = mediaEl;
             }
+
+            try {
+                otherSourceNodeRef.current?.disconnect(analyser);
+            } catch (e) {
+                // noop
+            }
+
+            try {
+                sourceNodeRef.current.disconnect(analyser);
+            } catch (e) {
+                // noop
+            }
+
+            sourceNodeRef.current.connect(analyser);
+            analyser.connect(ctx.destination);
+
+            audioContextRef.current = ctx;
+            analyserRef.current = analyser;
+
+            if (onAnalyserReady) {
+                onAnalyserReady(analyser);
+            }
+        } catch (err) {
+            console.error("Failed to setup audio context:", err);
         }
     };
 
     useEffect(() => {
         initAudioContext();
     }, [onAnalyserReady, isVideoTrack, mediaSrc]);
+
+    useEffect(() => {
+        canvasRef.current = canvasElement;
+    }, [canvasElement]);
 
     useEffect(() => {
         if (!pendingAutoPlayRef.current || !canPlay) return;
@@ -137,8 +149,14 @@ const KaraokePlayer = React.memo(React.forwardRef(({
     }, [isPoppedOut, mediaSrc, isVideoTrack, canPlay]);
 
     useEffect(() => {
-        const mediaEl = getMediaElement();
+        const applyVolume = (el) => {
+            if (el && typeof el.volume === 'number') {
+                el.volume = volume;
+            }
+        };
 
+        applyVolume(audioRef.current);
+        applyVolume(videoRef.current);
     }, [volume, mediaSrc, isVideoTrack]);
 
     useEffect(() => {
@@ -226,7 +244,13 @@ const KaraokePlayer = React.memo(React.forwardRef(({
 
             cdgPlayerRef.current.load(cdgDataRef.current);
 
-            if (audioRef.current && !audioRef.current.paused) {
+            const mediaEl = audioRef.current;
+            const currentMs = ((mediaEl?.currentTime || lastKnownTimeRef.current || 0) * 1000);
+            if (currentMs > 0) {
+                cdgPlayerRef.current.sync(currentMs);
+            }
+
+            if (mediaEl && !mediaEl.paused) {
                 cdgPlayerRef.current.play();
             }
         }
@@ -257,8 +281,9 @@ const KaraokePlayer = React.memo(React.forwardRef(({
             if (cdgPlayerRef.current) {
                 cdgPlayerRef.current.stop();
                 cdgPlayerRef.current.reset();
-                if (canvasElement) {
-                    const ctx = canvasElement.getContext('2d');
+                const currentCanvas = canvasRef.current;
+                if (currentCanvas) {
+                    const ctx = currentCanvas.getContext('2d');
                     ctx.fillStyle = 'black';
                     ctx.fillRect(0, 0, 300, 216);
                 }
@@ -266,8 +291,19 @@ const KaraokePlayer = React.memo(React.forwardRef(({
 
             try {
                 const token = localStorage.getItem('token');
+                const authResponse = await axios.post(`/api/library/songs/${songId}/authorize`, {}, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+                const downloadToken = authResponse.data?.token;
+                if (!downloadToken) {
+                    throw new Error('Unable to authorize download');
+                }
+
                 const response = await axios.get(`/api/library/songs/${songId}/download`, {
                     responseType: 'blob',
+                    params: { token: downloadToken },
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
@@ -334,7 +370,7 @@ const KaraokePlayer = React.memo(React.forwardRef(({
         };
 
         loadSong();
-    }, [songId, onError, isVideoTrack, canvasElement]);
+    }, [songId, onError, isVideoTrack]);
 
     useEffect(() => {
         if (songId) return;
