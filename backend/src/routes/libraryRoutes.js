@@ -63,10 +63,7 @@ router.get('/status', authenticateToken, async (req, res) => {
 // Protected: Any logged-in user (Singer/Admin)
 router.get('/search', authenticateTokenOrSinger, async (req, res) => {
     try {
-        const query = req.query.q;
-        if (!query) {
-            return res.status(400).json({ error: 'Search query required' });
-        }
+        const query = typeof req.query.q === 'string' ? req.query.q : '';
 
         const results = await libraryService.searchSongs(query);
         res.json(results);

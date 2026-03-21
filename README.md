@@ -26,6 +26,9 @@ The backend is configured via `backend/.env`. Required and optional values:
 - `DOWNLOAD_TOKEN_SECRET` (optional): HMAC secret used for short-lived media download tokens (defaults to `JWT_SECRET`).
 - `DOWNLOAD_TOKEN_TTL` (optional): Token lifetime in seconds (defaults to `60`).
 - `DOWNLOAD_RATE_LIMIT` (optional): Max library downloads per host per minute (defaults to `30`).
+- `YTDLP_BIN` (optional): Full path to the `yt-dlp` binary. For `pipx` installs under systemd, set this explicitly, for example `/home/craig/.local/bin/yt-dlp`.
+- `YTDLP_JS_RUNTIMES` (optional): JavaScript runtimes passed to `yt-dlp` via `--js-runtimes` (defaults to `node`).
+- `YTDLP_COOKIES_FILE` (optional): Path to a readable cookies file for restricted YouTube videos.
 
 ## Running the Project
 
@@ -69,6 +72,8 @@ Hosts can import karaoke tracks directly from YouTube.
 - **Requirement**: `yt-dlp` and `ffmpeg` must be installed on the backend server.
 - **Usage**: Paste a YouTube URL in the Host Dashboard to download.
 - **Storage**: Files are saved to a `#Youtube Karaoke Downloads` folder in your media library.
+- **Important for systemd deployments**: if `yt-dlp` was installed via `pipx`, set `YTDLP_BIN=/home/<user>/.local/bin/yt-dlp` in `backend/.env`. Otherwise the backend service may pick up an older `/usr/bin/yt-dlp` and fail on some YouTube videos.
+- **JS runtime hint**: set `YTDLP_JS_RUNTIMES=node` in `backend/.env` so newer `yt-dlp` builds can use Node for YouTube extraction.
 
 ### Real-Time Visualizer
 The Host UI includes a Web Audio API-based spectrum analyzer in the header that reacts to the currently playing track.
@@ -119,3 +124,4 @@ Example for this machine (installed in `craig` crontab):
 - **Volume slider regression:** the slider previously only updated component state; volume changes now apply to both `<audio>` and `<video>` elements immediately and persist via `localStorage`.
 - **Media download hardening:** `/api/library/songs/:id/authorize` now issues short-lived signed tokens that must accompany `/download` requests, downloads are rate-limited per host, and responses set `Cache-Control: no-store`. If a host reports 403/429 errors while loading tracks, check these guards and adjust `DOWNLOAD_TOKEN_TTL` / `DOWNLOAD_RATE_LIMIT` as needed.
 - **Visualizer silent for MP4 deck:** the analyser now rebinds when the active media element changes (e.g., pop-out swaps `<video>` tags). If the spectrum analyzer stops updating after toggling the deck, ensure the `initAudioContext` logic in `frontend/src/components/KaraokePlayer.jsx` is intact.
+- **YouTube import `Precondition check failed` / `Only images are available`**: this machine had two `yt-dlp` installs. The old system binary at `/usr/bin/yt-dlp` (`2024.04.09`) reproduced the import failure, while the newer pipx binary at `/home/craig/.local/bin/yt-dlp` (`2026.03.17`) worked. Fix by setting `YTDLP_BIN=/home/craig/.local/bin/yt-dlp` and `YTDLP_JS_RUNTIMES=node` in `backend/.env`, then restart `kjdj-backend.service`.

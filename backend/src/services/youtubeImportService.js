@@ -78,6 +78,11 @@ const getYtDlpBinary = () => {
     return binary;
 };
 
+const getYtDlpJsRuntimeArgs = () => {
+    const runtimes = process.env.YTDLP_JS_RUNTIMES || 'node';
+    return runtimes ? ['--js-runtimes', runtimes] : [];
+};
+
 const getYouTubeId = (rawUrl) => {
     try {
         const url = new URL(rawUrl);
@@ -155,6 +160,7 @@ const fetchMetadata = (url) => {
         const args = [
             '--skip-download',
             '--no-playlist',
+            ...getYtDlpJsRuntimeArgs(),
             ...getYtDlpCookieArgs(),
             '--print',
             '%(id)s||%(title)s||%(uploader)s||%(duration)s',
@@ -194,6 +200,7 @@ const downloadVideo = (url, outputTemplate, onProgress) => {
     return new Promise((resolve, reject) => {
         const args = [
             '--no-playlist',
+            ...getYtDlpJsRuntimeArgs(),
             ...getYtDlpCookieArgs(),
             '-f', 'bestvideo+bestaudio/best',
             '--merge-output-format', 'mp4',

@@ -109,13 +109,32 @@ const HostController = ({
         return () => clearInterval(interval);
     }, []);
 
-    const searchSongs = async () => {
-        if (!searchQuery) return;
+    const searchSongs = async (query = searchQuery) => {
+        const trimmedQuery = query.trim();
+        if (!trimmedQuery) {
+            setSongs([]);
+            return;
+        }
+
         try {
-            const res = await axios.get(`/api/library/search?q=${searchQuery}`);
+            const res = await axios.get(`/api/library/search?q=${encodeURIComponent(trimmedQuery)}`);
             setSongs((res.data || []).filter(song => !isVocalTrack(song)));
         } catch (err) { console.error(err); }
     };
+
+    useEffect(() => {
+        const trimmedQuery = searchQuery.trim();
+        if (!trimmedQuery) {
+            setSongs([]);
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            searchSongs(trimmedQuery);
+        }, 250);
+
+        return () => clearTimeout(timeoutId);
+    }, [searchQuery]);
 
     const handleRotationToggle = async (enabled) => {
         try {
@@ -183,6 +202,8 @@ const HostController = ({
         try {
             await axios.post('/api/library/refresh');
             fetchLibraryStatus();
+            setSearchQuery('');
+            setSongs([]);
         } catch (err) {
             console.error("Failed to refresh library:", err);
         }
@@ -227,8 +248,8 @@ const HostController = ({
                 }
                 if (status === 'done' || status === 'error') {
                     clearInterval(intervalId);
-                    if (status === 'done' && searchQuery) {
-                        searchSongs();
+                    if (status === 'done' && searchQuery.trim()) {
+                        searchSongs(searchQuery);
                     }
                 }
             } catch (err) {
@@ -443,7 +464,7 @@ const HostController = ({
                                     className="h-11 flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 />
                                 <button
-                                    onClick={searchSongs}
+                                    onClick={() => searchSongs()}
                                     className="h-11 rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
                                 >
                                     Search
@@ -452,7 +473,11 @@ const HostController = ({
 
                             <div className="mt-4 flex-1 min-h-0 overflow-y-auto rounded-lg border border-zinc-800">
                                 {songs.length === 0 ? (
-                                    <div className="p-4 text-sm text-zinc-500">Search results will appear here.</div>
+                                    <div className="p-4 text-sm text-zinc-500">
+                                        {searchQuery.trim()
+                                            ? 'No matching songs found.'
+                                            : `Start typing to search ${libraryStatus?.songCount?.toLocaleString?.() ?? 'the library'} songs.`}
+                                    </div>
                                 ) : (
                                     songs.map(song => (
                                         <div

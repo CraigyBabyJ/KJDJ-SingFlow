@@ -264,7 +264,7 @@ const searchSongs = async (query) => {
         WHERE active = 1 
         AND ${whereClause}
         ORDER BY artist ASC, title ASC 
-        LIMIT 50
+        LIMIT 100
     `;
 
     try {

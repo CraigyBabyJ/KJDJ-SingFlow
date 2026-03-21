@@ -176,6 +176,8 @@ If the backend stays on `3000`, update that proxy or set `PORT=3002` in `backend
 - yt-dlp is required for the host-only YouTube import feature.
 - If `yt-dlp` is installed via `pipx`, ensure `~/.local/bin` is on the backend PATH or set `YTDLP_BIN=/home/<user>/.local/bin/yt-dlp`.
 - Optional binary override: `YTDLP_BIN=/full/path/to/yt-dlp` (must be executable).
+- On this machine, the backend must use `YTDLP_BIN=/home/craig/.local/bin/yt-dlp`; the older `/usr/bin/yt-dlp` reproduced YouTube failures (`Precondition check failed`, `Only images are available for download`, `Requested format is not available`).
+- Set `YTDLP_JS_RUNTIMES=node` so yt-dlp can use Node as its JavaScript runtime for YouTube extraction.
 - Optional cookies support: set `YTDLP_COOKIES_FILE=/path/to/cookies.txt` to avoid 403s on restricted videos.
 - Optional auto-upgrade: `backend/scripts/yt-dlp-upgrade.sh` uses `pipx upgrade yt-dlp` and expects `pipx` on PATH.
 - Cron example (daily 03:15, logs to user home):
@@ -210,3 +212,4 @@ If the backend stays on `3000`, update that proxy or set `PORT=3002` in `backend
 - CDG restarts when toggling Pop-Out: the loader effect should only depend on `songId` (not `canvasElement`). Confirm `cdgPlayer` initialization reuses `audioRef.current.currentTime` when a new canvas mounts so docking/undocking doesn’t reload the ZIP.
 - Library downloads failing with 403/429: hosts must call `POST /api/library/songs/:id/authorize` to obtain a short-lived token before requesting `/download`. Each host is limited to `DOWNLOAD_RATE_LIMIT` files per minute (default 30); adjust env vars or wait for the one-minute window to reset.
 - Spectrum analyzer silent for MP4: whenever the deck swaps canvases/videos (e.g., pop-out), `initAudioContext` must re-create the `MediaElementSource` for the new `<video>` element. Confirm the logic that stores `audioSourceElementRef`/`videoSourceElementRef` is present.
+- YouTube import fails with `Precondition check failed` / `Only images are available`: verify the backend service is not using `/usr/bin/yt-dlp`. On this machine the working config is `YTDLP_BIN=/home/craig/.local/bin/yt-dlp` and `YTDLP_JS_RUNTIMES=node` in `backend/.env`, then restart `kjdj-backend.service`.
