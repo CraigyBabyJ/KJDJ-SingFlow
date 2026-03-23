@@ -74,9 +74,9 @@ const SingerRequestPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-zinc-900 text-zinc-100">
+        <div className="min-h-screen bg-zinc-900 text-zinc-100" style={{ minHeight: '100dvh' }}>
             <div className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 px-4 py-4 backdrop-blur">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-xl font-semibold">Add Songs</h1>
                         <p className="text-sm text-zinc-400">Queued as: {session?.displayName}</p>
@@ -84,24 +84,24 @@ const SingerRequestPage = () => {
                     </div>
                     <button
                         onClick={handleEndSession}
-                        className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-200 transition hover:border-zinc-500"
+                        className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-200 transition hover:border-zinc-500 sm:self-start"
                     >
                         End Session
                     </button>
                 </div>
 
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-stretch">
                     <input
                         type="text"
                         placeholder="Search songs..."
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && searchSongs()}
-                        className="h-12 flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-4 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="h-12 w-full min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-4 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                     <button
                         onClick={searchSongs}
-                        className="h-12 rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+                        className="h-12 w-full rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 sm:w-auto sm:min-w-[112px]"
                     >
                         Search
                     </button>
@@ -125,14 +125,14 @@ const SingerRequestPage = () => {
                             <div
                                 key={song.id}
                                 title={song.file_path || ''}
-                                className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4"
+                                className="flex flex-col items-stretch gap-3 rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 sm:flex-row sm:items-center sm:justify-between"
                             >
-                                <div className="flex-1">
-                                    <div className="text-base font-semibold">{toTitleCase(song.title)} — {toTitleCase(song.artist)}</div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-base font-semibold break-words">{toTitleCase(song.title)} — {toTitleCase(song.artist)}</div>
                                 </div>
                                 <button
                                     onClick={() => handleQueue(song)}
-                                    className="h-12 rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+                                    className="h-12 rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 sm:min-w-[96px]"
                                 >
                                     Add
                                 </button>

@@ -594,7 +594,7 @@ const KaraokePlayer = React.memo(React.forwardRef(({
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
                 <div className="text-xs uppercase tracking-[0.3em] text-zinc-500">Deck</div>
                 <div className="flex items-center gap-2">
                     <button
@@ -657,8 +657,8 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                     </div>
                 </PopoutWindow>
             ) : (
-                <div className="flex items-center justify-center rounded-2xl border border-zinc-800 bg-black p-4">
-                    <div className="flex h-[216px] w-[300px] items-center justify-center">
+                <div className="flex items-center justify-center rounded-2xl border border-zinc-800 bg-black p-3 sm:p-4">
+                    <div className="flex aspect-[25/18] w-full max-w-[300px] items-center justify-center">
                         {status === 'idle' || status === 'loading' ? renderIdle() : (
                             isVideoTrack ? (
                                 <video
@@ -687,8 +687,8 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                 </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
                     <button
                         onClick={isPlaying ? handlePause : handlePlay}
                         className={`bg-transparent text-xl ${(canPlay || onLoadNext) ? 'text-zinc-100 hover:text-white' : 'text-zinc-600'}`}
@@ -756,9 +756,9 @@ const KaraokePlayer = React.memo(React.forwardRef(({
                         )}
                     </div>
                 </div>
-                <div className="ml-auto min-w-0 text-left">
+                <div className="min-w-0 text-left sm:ml-auto">
                     <div className="truncate text-sm font-semibold text-zinc-100">
-                        {nowSinger}
+                        {nowSinger || 'No singer loaded'}
                     </div>
                     <div className="truncate text-xs text-zinc-400">
                         {nowSong}

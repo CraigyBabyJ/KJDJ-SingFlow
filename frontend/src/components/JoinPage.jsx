@@ -58,8 +58,8 @@ const JoinPage = ({ token }) => {
     }
 
     return (
-        <div className="min-h-screen bg-zinc-900 text-zinc-100 flex items-center justify-center p-6">
-            <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950/70 p-6">
+        <div className="min-h-screen bg-zinc-900 text-zinc-100 flex items-center justify-center p-4 sm:p-6" style={{ minHeight: '100dvh' }}>
+            <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950/70 p-5 sm:p-6">
                 <h1 className="text-2xl font-semibold">Join {hostName || 'the host'}</h1>
                 <p className="mt-2 text-sm text-zinc-400">First name + initial (e.g., Jordan H)</p>
 

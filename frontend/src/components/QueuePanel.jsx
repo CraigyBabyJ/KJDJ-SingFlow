@@ -23,24 +23,24 @@ const SortableQueueItem = ({ item, onAction, onPlayItem, dragDisabled }) => {
             {...attributes}
             className={`rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 ${isDragging ? 'ring-2 ring-emerald-500/40' : ''}`}
         >
-            <div className="flex items-center gap-3">
+            <div className="flex items-start gap-3">
                 <button
                     {...(dragDisabled ? {} : listeners)}
-                    className={`text-zinc-500 ${dragDisabled ? 'cursor-not-allowed opacity-40' : 'hover:text-zinc-300'}`}
+                    className={`pt-1 text-zinc-500 ${dragDisabled ? 'cursor-not-allowed opacity-40' : 'hover:text-zinc-300'}`}
                     aria-label="Drag"
                 >
                     ☰
                 </button>
                 <div className="flex-1 min-w-0">
-                    <div className="text-base font-semibold text-zinc-100">{item.singer_name}</div>
+                    <div className="break-words text-base font-semibold text-zinc-100">{item.singer_name}</div>
                     <div
-                        className="text-sm text-zinc-300 truncate"
+                        className="break-words text-sm text-zinc-300"
                         title={item.file_path || undefined}
                     >
                         {toTitleCase(item.title)} — {toTitleCase(item.artist)}
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 self-center">
                     <button
                         onClick={() => onPlayItem?.(item.id)}
                         className="text-lg text-emerald-300 hover:text-emerald-200"
@@ -105,7 +105,7 @@ const QueuePanel = ({ queue, onUpdate, onReorder, onPlayItem, rotationEnabled })
     };
 
     return (
-        <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 lg:min-h-[420px]">
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 xl:min-h-[420px]">
             <div className="flex items-center justify-between">
                 <div>
                     <h3 className="text-lg font-semibold">Queue</h3>
@@ -114,7 +114,7 @@ const QueuePanel = ({ queue, onUpdate, onReorder, onPlayItem, rotationEnabled })
                     </p>
                 </div>
             </div>
-            <div className="mt-4 flex-1 min-h-0 space-y-3 overflow-y-auto">
+            <div className="mt-4 min-h-[260px] flex-1 space-y-3 overflow-y-auto">
                 {queue.length === 0 ? (
                     <div className="text-sm text-zinc-500">Queue is empty.</div>
                 ) : (

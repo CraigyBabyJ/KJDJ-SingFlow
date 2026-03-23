@@ -47,6 +47,19 @@ const HostController = ({
     const [youtubeSong, setYoutubeSong] = useState(null);
     const [youtubeError, setYoutubeError] = useState('');
     const [youtubeLoading, setYoutubeLoading] = useState(false);
+    const [isSmallScreen, setIsSmallScreen] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return window.matchMedia('(max-width: 639px)').matches;
+    });
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+        const mediaQuery = window.matchMedia('(max-width: 639px)');
+        const handleChange = (event) => setIsSmallScreen(event.matches);
+        setIsSmallScreen(mediaQuery.matches);
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, []);
 
     const fetchData = async () => {
         try {
@@ -145,8 +158,29 @@ const HostController = ({
         }
     };
 
-    const handleQueueSong = async (song) => {
-        const name = newSingerName || selectedSinger;
+    const playQueueItemNow = async (queueId) => {
+        if (!queueId) return;
+        const newOrder = [queueId, ...queue.filter(item => item.id !== queueId).map(item => item.id)];
+        const orderIndex = new Map(newOrder.map((id, index) => [id, index]));
+        setQueue([...queue].sort((a, b) => orderIndex.get(a.id) - orderIndex.get(b.id)));
+        setQueueOrder(newOrder);
+
+        try {
+            if (rotationEnabled && queue[0]?.id !== queueId) {
+                await axios.patch('/api/rotation/settings', { rotationEnabled: false });
+                setRotationEnabled(false);
+            }
+            await axios.patch('/api/queue/reorder', { queueIds: newOrder });
+            await onLoadNext();
+        } catch (err) {
+            console.error(err);
+            setSingerNotice('Failed to start playback.');
+        }
+    };
+
+    const handleQueueSong = async (song, options = {}) => {
+        const { playNow = false } = options;
+        const name = isSmallScreen ? toTitleCase(user.username || 'Host') : (newSingerName || selectedSinger);
         if (!name) {
             setSingerNotice('Select a singer first.');
             return;
@@ -172,9 +206,12 @@ const HostController = ({
                 ]));
             }
             setQueuedSongIdsLocal(prev => (prev.includes(song.id) ? prev : [...prev, song.id]));
-            fetchData();
             setSingerNotice('');
             setNewSingerName('');
+            await fetchData();
+            if (playNow && queueId) {
+                await playQueueItemNow(queueId);
+            }
         } catch (err) {
             console.error("Failed to queue:", err);
             setSingerNotice('Failed to queue song.');
@@ -341,25 +378,25 @@ const HostController = ({
     };
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden">
-            <div className="border-b border-zinc-800 bg-zinc-950/60 px-6 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-h-screen flex-col bg-zinc-900" style={{ minHeight: '100dvh' }}>
+            <div className="border-b border-zinc-800 bg-zinc-950/60 px-4 py-3 sm:px-6">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <div className="text-xl font-semibold text-zinc-100 drop-shadow-[0_0_12px_rgba(255,255,255,0.25)]">
                             KJDJ SingFlow
                         </div>
-                        <div className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.3em] text-zinc-400 leading-none">
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-medium uppercase tracking-[0.24em] text-zinc-400 sm:text-[11px] sm:tracking-[0.3em]">
                             <span>Let’s keep the mic moving.</span>
                             {/* Real-time audio spectrum visualizer in the header */}
-                            <AudioVisualizer analyser={audioAnalyser} width={160} height={20} className="-mt-0.5 block" />
+                            <AudioVisualizer analyser={audioAnalyser} width={160} height={20} className="-mt-0.5 hidden sm:block" />
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
                         {joinUrl && (
                             <button
                                 onClick={() => setShowInvite(true)}
-                                className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"
+                                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"
                             >
                                 🎤 Invite
                             </button>
@@ -367,12 +404,12 @@ const HostController = ({
                         {(user.username || '').trim().toLowerCase().includes('craig') && (
                             <button
                                 onClick={() => setShowHosts(true)}
-                                className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"
+                                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"
                             >
                                 Hosts
                             </button>
                         )}
-                        <div className="hidden sm:block">
+                        <div className="w-full text-[11px] text-zinc-500 sm:w-auto sm:text-xs">
                             {libraryStatus?.isScanning
                                 ? `Scanning ${libraryStatus.scanProgress?.current ?? 0}/${libraryStatus.scanProgress?.total ?? 0}`
                                 : `Library: ${libraryStatus?.songCount ?? 0} songs total`}
@@ -380,98 +417,102 @@ const HostController = ({
                         <button
                             onClick={handleRefreshLibrary}
                             disabled={libraryStatus?.isScanning}
-                            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-500"
+                            className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-500"
                         >
                             Refresh Lib
                         </button>
                         <button
                             onClick={() => setShowYoutubeImport(true)}
-                            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"
+                            className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"
                         >
                             YouTube Import
                         </button>
                         <button
                             onClick={onLogout}
-                            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"
+                            className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-200 transition hover:border-zinc-500 hover:text-white"
                         >
                             Logout
                         </button>
-                        <span className="text-[11px] text-zinc-500">Signed in as {toTitleCase(user.username)}</span>
+                        <span className="w-full text-[11px] text-zinc-500 sm:w-auto">Signed in as {toTitleCase(user.username)}</span>
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-hidden p-4 pb-8">
-                <div className="grid h-full min-h-0 gap-4 lg:grid-cols-3 lg:grid-rows-[minmax(0,1fr)] lg:items-stretch">
-                    <div className="order-3 flex h-full min-h-0 flex-col gap-4 lg:order-none">
-                        <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 lg:min-h-[420px]">
-                            <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 p-3 pb-6 sm:p-4 sm:pb-8">
+                <div className="grid gap-4 xl:grid-cols-3 xl:items-start">
+                    <div className="order-2 flex min-h-0 flex-col gap-4 xl:order-none">
+                        <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 xl:min-h-[420px]">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <h3 className="text-lg font-semibold">Add to Queue</h3>
-                                    <p className="text-sm text-zinc-400">Search the library and add singers</p>
+                                    <h3 className="text-lg font-semibold">{isSmallScreen ? 'Find and Play' : 'Add to Queue'}</h3>
+                                    <p className="text-sm text-zinc-400">{isSmallScreen ? 'Pick a singer, search, then tap a song to play it now' : 'Search the library and add singers'}</p>
                                 </div>
-                                <label className="flex items-center gap-2 text-xs text-zinc-400">
-                                    <input
-                                        type="checkbox"
-                                        checked={!!rotationEnabled}
-                                        onChange={(e) => handleRotationToggle(e.target.checked)}
-                                        className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
-                                    />
-                                    Rotate Singer
-                                </label>
+                                {!isSmallScreen && (
+                                    <label className="flex items-center gap-2 text-xs text-zinc-400">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!rotationEnabled}
+                                            onChange={(e) => handleRotationToggle(e.target.checked)}
+                                            className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
+                                        />
+                                        Rotate Singer
+                                    </label>
+                                )}
                             </div>
 
-                            <div className="mt-4">
-                                <label className="text-xs uppercase tracking-widest text-zinc-500">Singer</label>
-                            <div className="mt-2 grid gap-2 md:grid-cols-2">
-                                <select
-                                    value={selectedSinger}
-                                    onChange={e => { setSelectedSinger(e.target.value); setNewSingerName(''); }}
-                                    className="h-10 w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                    >
-                                        <option value="">New / Select</option>
-                                        {singers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                                    </select>
-                                <input
-                                    type="text"
-                                    placeholder="Or type new name..."
-                                    value={newSingerName}
-                                    onChange={e => { setNewSingerName(e.target.value); setSelectedSinger(''); }}
-                                    className="h-10 w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                />
-                            </div>
-                            <div className="mt-2 min-h-[16px] text-xs text-amber-400">
-                                {singerNotice}
-                            </div>
-                            <div className="mt-2 flex items-center gap-3">
-                                <button
-                                    onClick={handleDeleteSinger}
-                                    className="rounded-lg border border-red-500/60 px-3 py-1 text-xs text-red-300 transition hover:border-red-400 hover:text-red-200"
-                                >
-                                    Delete Singer
-                                </button>
-                                <span className="min-h-[16px] text-xs text-amber-400">{deleteNotice}</span>
-                            </div>
-                        </div>
+                            {!isSmallScreen && (
+                                <div className="mt-4">
+                                    <label className="text-xs uppercase tracking-widest text-zinc-500">Singer</label>
+                                    <div className="mt-2 grid gap-2 md:grid-cols-2">
+                                        <select
+                                            value={selectedSinger}
+                                            onChange={e => { setSelectedSinger(e.target.value); setNewSingerName(''); }}
+                                            className="h-10 w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            >
+                                                <option value="">New / Select</option>
+                                                {singers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                            </select>
+                                        <input
+                                            type="text"
+                                            placeholder="Or type new name..."
+                                            value={newSingerName}
+                                            onChange={e => { setNewSingerName(e.target.value); setSelectedSinger(''); }}
+                                            className="h-10 w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                    <div className="mt-2 min-h-[16px] text-xs text-amber-400">
+                                        {singerNotice}
+                                    </div>
+                                    <div className="mt-2 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                        <button
+                                            onClick={handleDeleteSinger}
+                                            className="rounded-lg border border-red-500/60 px-3 py-1 text-xs text-red-300 transition hover:border-red-400 hover:text-red-200"
+                                        >
+                                            Delete Singer
+                                        </button>
+                                        <span className="min-h-[16px] text-xs text-amber-400">{deleteNotice}</span>
+                                    </div>
+                                </div>
+                            )}
 
-                            <div className="mt-4 flex gap-2">
+                            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-stretch">
                                 <input
                                     type="text"
                                     placeholder="Search songs..."
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && searchSongs()}
-                                    className="h-11 flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    className="h-11 w-full min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 />
                                 <button
                                     onClick={() => searchSongs()}
-                                    className="h-11 rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+                                    className="h-11 w-full rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 sm:w-auto sm:min-w-[112px]"
                                 >
-                                    Search
+                                    {isSmallScreen ? 'Find Song' : 'Search'}
                                 </button>
                             </div>
 
-                            <div className="mt-4 flex-1 min-h-0 overflow-y-auto rounded-lg border border-zinc-800">
+                            <div className="mt-4 min-h-[40dvh] flex-1 overflow-y-auto rounded-lg border border-zinc-800 sm:min-h-[320px] xl:min-h-[260px]">
                                 {songs.length === 0 ? (
                                     <div className="p-4 text-sm text-zinc-500">
                                         {searchQuery.trim()
@@ -483,9 +524,10 @@ const HostController = ({
                                         <div
                                             key={song.id}
                                             title={song.file_path || ''}
-                                            className="flex items-center justify-between gap-3 border-b border-zinc-800 px-2 py-0.5 last:border-b-0"
+                                            className={`flex items-center justify-between gap-3 border-b border-zinc-800 px-3 py-2 last:border-b-0 ${isSmallScreen ? 'cursor-pointer active:bg-zinc-900/70' : ''}`}
+                                            onClick={isSmallScreen ? () => handleQueueSong(song, { playNow: true }) : undefined}
                                         >
-                                            <div className="text-sm font-semibold text-zinc-100 truncate">
+                                            <div className="min-w-0 text-sm font-semibold text-zinc-100 truncate">
                                                 {toTitleCase(song.title)} — {toTitleCase(song.artist)}
                                             </div>
                                             {queuedSongIds.has(song.id) ? (
@@ -494,11 +536,14 @@ const HostController = ({
                                                 </span>
                                             ) : (
                                                 <button
-                                                    onClick={() => handleQueueSong(song)}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        handleQueueSong(song, { playNow: isSmallScreen });
+                                                    }}
                                                     className="rounded-full bg-transparent px-2 py-0.5 text-sm font-semibold text-emerald-300 transition hover:text-emerald-200"
-                                                    aria-label="Add to queue"
+                                                    aria-label={isSmallScreen ? 'Play now' : 'Add to queue'}
                                                 >
-                                                    ➕
+                                                    {isSmallScreen ? '▶️' : '➕'}
                                                 </button>
                                             )}
                                         </div>
@@ -508,7 +553,7 @@ const HostController = ({
                         </div>
                     </div>
 
-                    <div className="order-2 flex h-full min-h-0 flex-col gap-4 lg:order-none">
+                    <div className="order-3 flex min-h-0 flex-col gap-4 xl:order-none">
                         <QueuePanel
                             queue={orderedQueue}
                             onUpdate={fetchData}
@@ -516,41 +561,24 @@ const HostController = ({
                                 setQueue(nextQueue);
                                 setQueueOrder(nextQueue.map(item => item.id));
                             }}
-                            onPlayItem={async (queueId) => {
-                                if (!queueId) return;
-                                const newOrder = [queueId, ...orderedQueue.filter(item => item.id !== queueId).map(item => item.id)];
-                                const orderIndex = new Map(newOrder.map((id, index) => [id, index]));
-                                setQueue([...orderedQueue].sort((a, b) => orderIndex.get(a.id) - orderIndex.get(b.id)));
-                                setQueueOrder(newOrder);
-
-                                try {
-                                    if (rotationEnabled && orderedQueue[0]?.id !== queueId) {
-                                        await axios.patch('/api/rotation/settings', { rotationEnabled: false });
-                                        setRotationEnabled(false);
-                                    }
-                                    await axios.patch('/api/queue/reorder', { queueIds: newOrder });
-                                    await onLoadNext();
-                                } catch (err) {
-                                    console.error(err);
-                                }
-                            }}
+                            onPlayItem={playQueueItemNow}
                             rotationEnabled={rotationEnabled}
                         />
                     </div>
 
-                    <div className="order-1 flex h-full min-h-0 flex-col gap-4 lg:order-none">
-                        <div className="order-2 flex min-h-0 flex-col rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 lg:order-none lg:min-h-[260px]">
+                    <div className="order-1 flex min-h-0 flex-col gap-4 xl:order-none">
+                        <div className="hidden min-h-0 flex-col rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 xl:flex xl:min-h-[260px]">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="text-xs uppercase tracking-[0.3em] text-zinc-500">Up Next</div>
                                     <div className="text-lg font-semibold">Rotation Preview</div>
                                 </div>
                             </div>
-                            <div className="mt-3 max-h-[200px] overflow-y-auto">
+                            <div className="mt-3 overflow-y-auto xl:max-h-[200px]">
                                 {upcomingFiltered.length === 0 ? (
                                     <div className="text-sm text-zinc-500">No one queued yet.</div>
                                 ) : (
-                                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                    <div className="grid gap-2 sm:grid-cols-2">
                                         {upcomingFiltered.slice(0, 9).map((item) => (
                                             <div key={item.queue_id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm">
                                                 <div className="truncate font-semibold text-zinc-100">
@@ -566,7 +594,7 @@ const HostController = ({
                             </div>
                         </div>
 
-                        <div className="order-1 flex flex-1 flex-col rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 lg:order-none lg:min-h-[420px]">
+                        <div className="flex flex-1 flex-col rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 xl:min-h-[420px]">
                             <div className="flex-1 min-h-0">
                                 {children}
                             </div>
@@ -574,7 +602,7 @@ const HostController = ({
                     </div>
                 </div>
             </div>
-            <div className="border-t border-zinc-800 bg-zinc-950/40 px-6 py-3 text-center text-xs text-zinc-500">
+            <div className="border-t border-zinc-800 bg-zinc-950/40 px-4 py-3 text-center text-xs text-zinc-500 sm:px-6">
                 <a
                     href="https://discord.craigybabyj.com"
                     target="_blank"
@@ -589,8 +617,8 @@ const HostController = ({
                 <div className="mt-2">craigybabyj © 2025</div>
             </div>
             {showInvite && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-                    <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-zinc-100 shadow-soft">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 sm:p-6">
+                    <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-5 text-zinc-100 shadow-soft sm:p-6">
                         <div className="flex items-center justify-between">
                             <div className="text-lg font-semibold">Invite Singers</div>
                             <button
@@ -629,8 +657,8 @@ const HostController = ({
                 </div>
             )}
             {showHosts && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-                    <div className="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-zinc-100 shadow-soft">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 sm:p-6">
+                    <div className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-5 text-zinc-100 shadow-soft sm:p-6">
                         <div className="flex items-center justify-between">
                             <div className="text-lg font-semibold">Hosts</div>
                             <button
@@ -689,8 +717,8 @@ const HostController = ({
                 </div>
             )}
             {showYoutubeImport && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-                    <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-zinc-100 shadow-soft">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 sm:p-6">
+                    <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-5 text-zinc-100 shadow-soft sm:p-6">
                         <div className="flex items-center justify-between">
                             <div className="text-lg font-semibold">YouTube Import</div>
                             <button
